@@ -30,6 +30,9 @@ jobs:
           scripts/verify-note.sh sign "$note"
           scripts/verify-note.sh verify "$note"
 
+      - name: Install age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
       # Encryption is the other half of the demonstration. A note encrypted to
       # the burned public key has to open with the burned private key.
       - name: Encrypt and decrypt a note
