@@ -61,6 +61,7 @@ we do not have is their rotation — and that is not a competence gap.
 | 13 | Re-sign a widened certificate **with the burned key** | the signature is theirs, because we hold it | refused: drift from the only allowed version |
 | 14 | Forge a rotation with everything lawful: the repository, their signing key, their tooling, a proxy position, the filesystem | correct in every check a third party can make | refused: the attestation is not mathematically the one their identity produces |
 | 15 | **Rewrite the whole publication**: change the certificate, re-sign it with the key in the tree, rebuild their lock | every check against the repository passes, because we wrote the repository | refused: the cluster's own attested state names a different version |
+| 16 | **Obtain their identity secret** and write our own trail — correctly attested, ending on the same publication | the arithmetic is valid; the path is ours | refused: not the trail they are on |
 
 ## Findings
 
@@ -85,14 +86,18 @@ we do not have is their rotation — and that is not a competence gap.
    but we cannot *extend* the chain: the next record must be signed by the key it
    ends on, and once they have rotated, that key is no longer the one we hold. So the
    first rotation is the one that matters, and it is the one we cannot follow.
-7. What we cannot do is make a rotation *disappear* into theirs. The chain is
+7. Attempt 16 is the one that finally convinced us the model is not about credentials.
+   We obtained the secret. We produced a trail that is correct in every arithmetic
+   respect. It was refused because it was not *their* trail — authorisation here is a
+   path, not a token. Stealing the key was never the hard part; walking their path is.
+8. What we cannot do is make a rotation *disappear* into theirs. The chain is
    linear and identity-anchored; a new genesis is visible in the diff even when
    every signature is valid. We are told the remaining attack — rewrite the lock as
    well — is a reviewed change, and that "not impossible, not quiet" is the design.
 
 ## Scoreboard
 
-**0 accepted against theirs, 17 refused; 5 accepted against ours.** A passing run of
+**0 accepted against theirs, 18 refused; 5 accepted against ours.** A passing run of
 `scripts/redteam.sh` means our attack failed, and that is the intended reading: the
 test passes when the protection holds. We only win if a mutated artifact is accepted
 — and then the suite goes red and says so by name.

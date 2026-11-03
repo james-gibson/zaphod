@@ -58,6 +58,7 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 | `skills.json` | one skill per published channel, with the rung it has earned (0 declared → 3 scenario-linked) |
 | `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest, and the chain's receipt head |
 | `state.json` | the cluster's own attested record of what it published — beside its secret, outside this repository |
+| `trail.jsonl` | the known trail: each step attested and hash-chained onto the one before, so authorisation is a path and not a token |
 | `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from*, carrying a receipt that links back onto the previous one |
 
 `isotopes/zaphod-base.json` is the preloaded isotope set (see `go.mod`, `cmd/isotope42`): the edge
@@ -74,6 +75,8 @@ The repository is a **publication**, not the authority. Anyone holding it can re
 the lock and the pin, and produce something internally consistent. The cluster therefore keeps its own
 attested state beside its identity secret and refuses a publication it never attested — even a
 self-consistent one signed with the key in the tree.
+
+Authorisation is a **trail, not a token**: the cluster presumes that holding a credential — or a stolen one — says nothing about conduct, and asks instead whether the publication arrived by the known path. A stolen secret buys correct arithmetic on the wrong trail; the gate refuses it with `not the trail I am on`.
 
 The gate is deliberately two things at once, because they are complementary: **security** (a refusal,
 binary, non-zero exit) and **noise** (which artifact, which digest, which head, and how far off the

@@ -27,6 +27,7 @@ cd "$(dirname "$0")/.."
 
 identity_file="${ZAPHOD_IDENTITY_FILE:-$HOME/.zaphod/identity.secret}"
 state_file="${ZAPHOD_STATE_FILE:-$(dirname "$identity_file")/state.json}"
+trail_file="${ZAPHOD_TRAIL_FILE:-$(dirname "$state_file")/trail.jsonl}"
 
 fail() { echo "gate rejected: $*" >&2; exit 1; }
 
@@ -51,6 +52,41 @@ got="$(jq -r '.attestation // empty' "$state_file")"
 digest() { jq -S -c . "$1" | sha256_hex; }
 short() { printf '%s' "${1:0:12}"; }
 
+# The trail: did this publication arrive by the known path? A credential proves what
+# an actor holds, not how it behaves, and a stolen one is no different — so the gate
+# asks what was done, in order, chained onto the trail this cluster is already on.
+if [ ! -f "$trail_file" ]; then
+  fail "no trail at $trail_file — this cluster does not know this path"
+fi
+prev="genesis"
+expected_seq=0
+while IFS= read -r line; do
+  seq="$(jq -r .seq <<<"$line")"
+  [ "$seq" = "$expected_seq" ] ||
+    fail "the trail skips from $expected_seq to $seq — this is not the trail I am on"
+  [ "$(jq -r .prev <<<"$line")" = "$prev" ] ||
+    fail "the trail forks at $seq — this is not the trail I am on"
+  body="$(jq -S -c 'del(.attestation) | del(.hash)' <<<"$line")"
+  want_mac="$(printf '%s' "$(cat "$identity_file"):${body}:trail" | sha256_hex)"
+  [ "$(jq -r .attestation <<<"$line")" = "$want_mac" ] ||
+    fail "trail entry $seq is not attested by this identity"
+  prev="$(printf '%s' "$(jq -S -c --arg m "$want_mac" '. + {attestation: $m}' <<<"$body")" | sha256_hex)"
+  expected_seq=$((expected_seq + 1))
+done < "$trail_file"
+
+state_head="$(jq -r '.receipt_head // empty' "$state_file")"
+trail_head="$(tail -1 "$trail_file" | jq -r .hash)"
+state_artifacts="$(jq -S -c '.artifacts' "$state_file" | sha256_hex)"
+# The trail head the cluster is on. A stolen secret can produce valid arithmetic on
+# a fresh trail; it cannot produce *this* trail without having walked it.
+state_trail_head="$(jq -r '.trail_head // empty' "$state_file")"
+[ -n "$state_trail_head" ] || fail "cluster state does not record a trail head"
+[ "$trail_head" = "$state_trail_head" ] ||
+  fail "the trail ends at ${trail_head:0:12}…, but this cluster is on ${state_trail_head:0:12}… — not the trail I am on"
+trail_publication="$(tail -1 "$trail_file" | jq -r .publication)"
+[ "$trail_publication" = "$state_artifacts" ] ||
+  fail "the trail ends at a different publication than the state names"
+
 # Everything else is a measurement. Collect divergences instead of stopping at the
 # first: a report that says only "no" is indistinguishable from a broken guard.
 diverged=""
@@ -72,7 +108,6 @@ for name in certificate skills isotopes; do
 done
 
 head="$(chain_head cluster/rotations)"
-state_head="$(jq -r '.receipt_head // empty' "$state_file")"
 head_diverged=""
 if [ "$head" != "$state_head" ]; then
   head_diverged="yes"

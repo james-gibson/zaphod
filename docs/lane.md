@@ -97,6 +97,39 @@ anything inside the space it owns; every change outside that space arrives as a
 record — a rotation with a signature, a lock rewrite, a diff — and what is not
 recorded is refused by arithmetic rather than by process.
 
+## Authorisation is a trail, not a token
+
+A security token is issued on the assumption that the bearer will behave once it has
+one. A stolen token does not even carry that assumption — the thief has made no
+promise to anybody. So the cluster presumes **both** are wrong: what an actor holds
+proves nothing about what it will do, and a credential is not evidence of conduct.
+
+What a genuinely authorised actor does instead is leave a **trail**: identity, then a
+rotation, then a publication, each step chained to the one before and to the head the
+cluster is already on. That is what the cluster checks.
+
+```
+<identity-dir>/trail.jsonl        # seq, action, publication, prev, at, attestation, hash
+<identity-dir>/state.json         # what was published, the chain head, the trail head
+```
+
+- every entry is attested with the identity secret and carries the hash of the one
+  before it, so the trail is a chain and not a list;
+- the gate recomputes the chain, refuses a gap or a fork, and compares the head with
+  the one its state records;
+- the last entry's publication must be what is published now.
+
+A stolen secret therefore buys **correct arithmetic on the wrong trail**. The forged
+entries verify — same secret, same formula — and the gate still refuses:
+
+```
+held  trail: correct arithmetic with a stolen secret — not the trail I am on
+```
+
+That is the difference between authentication and authorisation stated in the only
+way a machine can state it: not "who are you", but "did you get here the way we get
+here". A token asks the first question and presumes the answer covers the second.
+
 ## Noise and security are complementary
 
 The layers above this one presume they provide **security**: they are asked whether

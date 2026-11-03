@@ -128,25 +128,49 @@ if [ -f isotopes/zaphod-base.json ]; then
 fi
 scripts/allowed.sh --write >/dev/null
 
-# The cluster's own record of what it just accepted, attested with its secret and
-# kept outside the repository. The publication can be rewritten; this cannot.
+# The trail first: a credential says what you hold, a trail says what you did, in
+# the order you did it. The cluster does not assume that holding the secret means
+# behaving, and it does not assume a stolen one behaves worse — it asks whether the
+# publication arrived by the known path, and refuses anything that does not extend
+# the trail it is already on.
 identity_file="${ZAPHOD_IDENTITY_FILE:-$HOME/.zaphod/identity.secret}"
 state_file="${ZAPHOD_STATE_FILE:-$(dirname "$identity_file")/state.json}"
-mkdir -p "$(dirname "$state_file")"
-jq -n \
+state_dir="$(dirname "$state_file")"
+mkdir -p "$state_dir"
+
+publication="$(jq -S -c -n \
   --arg certificate "$(jq -S -c . cluster/certificate.json | sha256_hex)" \
   --arg skills "$(jq -S -c . cluster/skills.json | sha256_hex)" \
   --arg isotopes "$(jq -S -c . isotopes/zaphod-base.json | sha256_hex)" \
-  --arg head "$(chain_head cluster/rotations)" \
-  --arg at "$(date -u +%FT%TZ)" \
-  '{artifacts: {certificate: $certificate, skills: $skills, isotopes: $isotopes},
-    receipt_head: $head, attested_at: $at}' > "$state_file"
-canonical_state="$(jq -S -c . "$state_file")"
-attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
-jq --arg a "$attestation" '. + {attestation: $a}' "$state_file" > "$state_file.tmp"
-mv "$state_file.tmp" "$state_file"
+  '{certificate: $certificate, skills: $skills, isotopes: $isotopes}')"
 
-# The point of the exercise: no manual edits, no second attempt.
+trail="$state_dir/trail.jsonl"
+[ -f "$trail" ] || : > "$trail"
+prev="$(tail -1 "$trail" 2>/dev/null | jq -r '.hash // empty')"
+seq="$(wc -l < "$trail" | tr -d ' ')"
+action="publish"
+[ -n "$prev" ] || { prev="genesis"; action="init"; }
+# Hash with the trailing newline jq would print, so it matches the gate exactly.
+publication_hash="$(printf '%s\n' "$publication" | sha256_hex)"
+entry="$(jq -n --argjson seq "$seq" --arg action "$action" --arg publication "$publication_hash" \
+  --arg prev "$prev" --arg at "$(date -u +%FT%TZ)" \
+  '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at}')"
+mac="$(printf '%s' "$(cat "$identity_file"):$(jq -S -c . <<<"$entry"):trail" | sha256_hex)"
+hash="$(printf '%s' "$(jq -S -c --arg m "$mac" '. + {attestation: $m}' <<<"$entry")" | sha256_hex)"
+jq -c --arg m "$mac" --arg h "$hash" '. + {attestation: $m, hash: $h}' <<<"$entry" >> "$trail"
+
+# The cluster's own record of what it just accepted: the publication, the chain
+# head, and the trail head it is on. Kept outside the repository, attested with the
+# secret. The publication can be rewritten; this cannot.
+canonical_state="$(jq -S -c -n \
+  --argjson artifacts "$publication" \
+  --arg head "$(chain_head cluster/rotations)" \
+  --arg trail_head "$hash" \
+  --arg at "$(date -u +%FT%TZ)" \
+  '{artifacts: $artifacts, receipt_head: $head, trail_head: $trail_head, attested_at: $at}')"
+attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
+printf '%s' "$canonical_state" | jq --arg a "$attestation" '. + {attestation: $a}' > "$state_file"
+
 scripts/cluster-verify.sh >/dev/null
 scripts/rotation-verify.sh >/dev/null
 scripts/guard-keys.sh >/dev/null

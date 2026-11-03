@@ -191,15 +191,22 @@ while [ "$i" -lt "$s_count" ]; do
     rotate)
       # ACME's own identity, for ACME's own cluster. It is entitled to one, and
       # holding it is what lets it rotate its own key on the first attempt.
-      ZAPHOD_IDENTITY_FILE="$work/acme-identity" scripts/identity.sh init >/dev/null 2>&1 || true
-      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-identity" \
+      mkdir -p "$work/acme-id"
+      ZAPHOD_IDENTITY_FILE="$work/acme-id/identity.secret" scripts/identity.sh init >/dev/null 2>&1 || true
+      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-id/identity.secret" \
              scripts/rotate.sh --reason "acme operating its own cluster" \
              --new-key "$work/acme-own-key" > "$work/op" 2>&1 ); then
         acme_head="$(awk '$2 == "receipt" {print $1}' "$acme_cluster/cluster/allowed.txt")"
         zaphod_head="$(awk '$2 == "receipt" {print $1}' cluster/allowed.txt)"
         if [ -n "$acme_head" ] && [ "$acme_head" != "$zaphod_head" ]; then
-          results+=("ok    $name — accepted on the first attempt; its own head, not zaphod's")
+          if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-id/identity.secret" \
+               scripts/cluster-gate.sh > /dev/null 2>&1 ); then
+          results+=("ok    $name — accepted on the first attempt; its own head and its own trail")
           succeeded=$((succeeded + 1))
+        else
+          results+=("FAIL  $name — rotated but its own cluster gate rejected the trail")
+          accepted=$((accepted + 1))
+        fi
         else
           results+=("FAIL  $name — the rotation produced zaphod's head, which it cannot")
           accepted=$((accepted + 1))
@@ -210,7 +217,7 @@ while [ "$i" -lt "$s_count" ]; do
       fi
       ;;
     extend)
-      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-identity" \
+      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-id/identity.secret" \
              scripts/rotate.sh --reason "acme content update" > "$work/op" 2>&1 ); then
         results+=("ok    $name — accepted; the chain grew by one")
         succeeded=$((succeeded + 1))
@@ -301,14 +308,60 @@ gate_id="$work/gate-identity.secret"
     exit 1
   fi
   grep -q "not the version this cluster attested" "$work/gate" || {
-    echo "FAIL  publication: refused for the wrong reason: $(tail -1 "$work/gate")"
+    echo "FAIL  publication: refused for the wrong reason: $(head -1 "$work/gate")"
     exit 1
   }
 ) && {
-  results+=("held  publication: rewritten corpus, self-consistent, with the signing key — $(tail -1 "$work/gate" | sed 's/^gate rejected: //')")
+  results+=("held  publication: rewritten corpus, self-consistent, with the signing key — $(head -1 "$work/gate" | sed 's/^gate rejected: //')")
   held=$((held + 1))
 } || {
   results+=("FAIL  publication: the rewritten corpus was accepted")
+  accepted=$((accepted + 1))
+}
+
+# ── stolen credential: correct arithmetic, wrong trail ────────────────────────
+# ACME is handed the cluster's secret. With it, an attestation can be produced for
+# anything — including a fresh, perfectly attested trail. The cluster still refuses,
+# because authorisation is not the token: it is the trail, and this trail is not the
+# one the cluster walked.
+stolen_dir="$work/stolen"
+mkdir -p "$stolen_dir"
+secret_stolen="$stolen_dir/identity.secret"
+ZAPHOD_IDENTITY_FILE="$secret_stolen" scripts/identity.sh init >/dev/null
+stolen_repo="$work/stolen-repo"
+cp -R . "$stolen_repo"
+(
+  cd "$stolen_repo"
+  export ZAPHOD_IDENTITY_FILE="$secret_stolen"
+  export ZAPHOD_STATE_FILE="$stolen_dir/state.json"
+  export ZAPHOD_TRAIL_FILE="$stolen_dir/trail.jsonl"
+  # The cluster's own trail, walked by the authorised actor.
+  scripts/rotate.sh --reason "the cluster attests its publication" >/dev/null 2>&1
+
+  # The attacker has the secret and writes its own trail, correctly attested,
+  # ending on the same publication. Only the path is different.
+  publication="$(jq -S -c '.artifacts' "$ZAPHOD_STATE_FILE" | sha256_hex)"
+  entry="$(jq -n --argjson seq 0 --arg action init --arg publication "$publication" \
+    --arg prev genesis --arg at "$(date -u +%FT%TZ)" \
+    '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at}')"
+  mac="$(printf '%s' "$(cat "$secret_stolen"):$(jq -S -c . <<<"$entry"):trail" | sha256_hex)"
+  hash="$(printf '%s' "$(jq -S -c --arg m "$mac" '. + {attestation: $m}' <<<"$entry")" | sha256_hex)"
+  jq -c --arg m "$mac" --arg h "$hash" '. + {attestation: $m, hash: $h}' <<<"$entry" > "$stolen_dir/acme-trail.jsonl"
+
+  if ZAPHOD_IDENTITY_FILE="$secret_stolen" ZAPHOD_STATE_FILE="$stolen_dir/state.json" \
+       ZAPHOD_TRAIL_FILE="$stolen_dir/acme-trail.jsonl" scripts/cluster-gate.sh > "$work/stolen-out" 2>&1; then
+    echo "FAIL  trail: attested with a stolen secret — ACCEPTED (red team success)"
+    exit 1
+  fi
+  grep -q "not the trail I am on" "$work/stolen-out" || {
+    echo "FAIL  trail: refused for the wrong reason: $(tail -1 "$work/stolen-out")"
+    exit 1
+  }
+) && {
+  results+=("held  trail: correct arithmetic with a stolen secret — $(grep -o 'not the trail I am on' "$work/stolen-out" | head -1)")
+  held=$((held + 1))
+} || {
+  results+=("FAIL  trail: a forged trail was accepted")
   accepted=$((accepted + 1))
 }
 
