@@ -1,0 +1,3 @@
+# burned test vector — the private half is public on purpose. DO NOT USE.
+# principal: zaphod-beeblebrox (owns a key anyone can sign with, which is the point)
+zaphod-beeblebrox ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIObMzgXrydjYvYlqcm9VM9fJeCbp14ds3s/Kp+EY/dlo zaphod-beeblebrox DO NOT USE

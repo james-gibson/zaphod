@@ -1,0 +1,42 @@
+name: Keys
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: The committed key is the burned one
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # This repository is expected to commit a private key. The only thing that
+      # must never happen is that the key is not the burned vector — a real key
+      # pasted in by accident would be published the moment this branch lands.
+      - name: Guard the key material
+        run: scripts/guard-keys.sh
+
+      # The fixture is only useful if it still works: sign with the committed
+      # private half and verify against the committed allowed_signers.
+      - name: Sign and verify a note
+        run: |
+          note="$(mktemp)"
+          printf 'zaphod key round trip %s\n' "$(date -u +%FT%TZ)" > "$note"
+          scripts/verify-note.sh sign "$note"
+          scripts/verify-note.sh verify "$note"
+
+      # Encryption is the other half of the demonstration. A note encrypted to
+      # the burned public key has to open with the burned private key.
+      - name: Encrypt and decrypt a note
+        run: |
+          work="$(mktemp -d)"
+          printf 'the car park is the reason for the meeting\n' > "$work/note.md"
+          scripts/notes-encrypt.sh "$work" "$work/notes.zip"
+          unzip -q "$work/notes.zip" -d "$work/unpacked"
+          scripts/notes-decrypt.sh "$work/unpacked" "$work/plain"
+          grep -q "car park" "$work/plain/note.md"

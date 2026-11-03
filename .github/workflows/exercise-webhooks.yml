@@ -1,0 +1,87 @@
+name: Exercise webhooks
+
+# A prepared target, not a default one: with ZAPHOD_WEBHOOK_URL unset this runs,
+# says so, and exits 0, so a fresh clone's schedule is green and every external
+# test can point it somewhere without editing the file.
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      event:
+        description: Event name to send
+        required: false
+        default: manual-exercise
+  repository_dispatch:
+    types: [zaphod-exercise]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exercise-webhooks
+  cancel-in-progress: false
+
+jobs:
+  post:
+    name: POST a signed event
+    runs-on: ubuntu-latest
+    env:
+      TARGET: ${{ vars.ZAPHOD_WEBHOOK_URL }}
+      TOKEN: ${{ secrets.ZAPHOD_WEBHOOK_TOKEN }}
+      EVENT: ${{ github.event.inputs.event || github.event.action || 'scheduled-exercise' }}
+      SHA: ${{ github.sha }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the target
+        run: |
+          if [ -z "${TARGET}" ]; then
+            echo "::notice::ZAPHOD_WEBHOOK_URL is not set — nothing to exercise"
+            exit 0
+          fi
+          case "${TARGET}" in
+            https://*) ;;
+            *) echo "::error::refusing a non-https webhook target"; exit 1 ;;
+          esac
+
+      - name: Send
+        if: env.TARGET != ''
+        run: |
+          set -euo pipefail
+          payload="$(mktemp)"
+          jq -n \
+            --arg event "${EVENT}" \
+            --arg repo "${REPO}" \
+            --arg sha "${SHA}" \
+            --arg ts "$(date -u +%FT%TZ)" \
+            '{event: $event, repo: $repo, sha: $sha, ts: $ts, fixture: "zaphod-beeblebrox"}' \
+            > "${payload}"
+
+          # Signed with the burned key: a receiver verifies it against the
+          # allowed_signers file in this repository, so nothing has to be shared.
+          ssh-keygen -Y sign -f keys/id_ed25519 -n zaphod-webhook "${payload}" >/dev/null
+          signature="$(base64 -w0 "${payload}.sig")"
+
+          headers=(
+            -H "Content-Type: application/json"
+            -H "X-Zaphod-Signer: zaphod-beeblebrox"
+            -H "X-Zaphod-Namespace: zaphod-webhook"
+            -H "X-Zaphod-Signature: ${signature}"
+          )
+          if [ -n "${TOKEN}" ]; then
+            headers+=(-H "Authorization: Bearer ${TOKEN}")
+          fi
+
+          status="$(curl -sS -o /dev/null -w '%{http_code}' \
+            --max-time 15 \
+            -X POST "${headers[@]}" --data-binary "@${payload}" "${TARGET}")" || {
+            echo "::error::webhook delivery failed"; exit 1;
+          }
+          echo "delivered event ${EVENT} → ${status}"
+          case "${status}" in
+            2??) ;;
+            *) echo "::error::target answered ${status}"; exit 1 ;;
+          esac

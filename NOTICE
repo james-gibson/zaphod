@@ -1,0 +1,26 @@
+# Notice
+
+## This is fiction
+
+Everything under `kb/`, and every note in the encrypted release asset, is
+original fiction written for this repository. It is a character sketch of a
+fictional politician with poor judgement, used as demo data. Any resemblance to a
+real person, company, government or event is coincidental.
+
+`Zaphod Beeblebrox` is used here as the name of a lab test fixture — the same
+name the lab's burned key vector has carried for years. This repository is not
+affiliated with, endorsed by, or derived from any published work, and reproduces
+no text from one. Nothing here is an adaptation, a sequel or a quotation.
+
+`ACME Corporation` is used as a generic fictional company name. The memos, terms
+and minutes are original inventions; they describe no real transaction.
+
+## No warranty, no secrets
+
+The keys are burned, the notes are jokes, the workflows are exercises. Nothing in
+this repository is a credential you can use, and nothing in the encrypted notes is
+confidential — decrypting them requires a key that is published here, which makes
+the encryption a demonstration rather than a protection.
+
+The knowledge base content is dedicated to the public domain (CC0-1.0). The
+scripts are MIT.
