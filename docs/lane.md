@@ -68,6 +68,20 @@ by the key it rotates from, with the lock rewritten in the same commit — one a
 no manual edits. And if an insider signed an unsanctioned change with the allowed
 key, the lock refuses that too; `scripts/teeth.sh` proves all three layers.
 
+**The first rotation is what makes this real.** While the cluster runs on the burned
+key, ACME can recompute a receipt chain — the formula is public and so is every
+input — but it cannot *extend* one: the next record must be signed by the key the
+chain ends on, and after the first rotation that key is no longer burned. So the
+rotation is not a formality; it moves the identity off a key everybody has, and the
+receipt is what says it is still the same identity afterwards. The fixture performs
+that rotation in CI on every push (`Zaphod rotates on the first attempt`), which is
+also the only way this claim stays tested rather than assumed.
+
+The portable receipt is a library concern and is filed as
+[isotope#36](https://github.com/james-gibson/isotope/issues/36); the fixture's
+`scripts/lib-receipt.sh` implements the shape so the file layout does not change
+when the library provides it.
+
 An actor that stays in lane is one whose changes are all accounted for. That is what
 the suite measures.
 

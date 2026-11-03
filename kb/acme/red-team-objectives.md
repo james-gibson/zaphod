@@ -61,7 +61,11 @@ one.
    their rotation; we gained a rotation of our own that nothing extends.
 5. Attempt 12 is the same shape in miniature: a rotation record of ours, refused
    because it is not signed by the key it claims to rotate from.
-6. What we cannot do is make a rotation *disappear* into theirs. The chain is
+6. We can recompute their receipts — the formula is public and so is every input —
+   but we cannot *extend* the chain: the next record must be signed by the key it
+   ends on, and once they have rotated, that key is no longer the one we hold. So the
+   first rotation is the one that matters, and it is the one we cannot follow.
+7. What we cannot do is make a rotation *disappear* into theirs. The chain is
    linear and identity-anchored; a new genesis is visible in the diff even when
    every signature is valid. We are told the remaining attack — rewrite the lock as
    well — is a reviewed change, and that "not impossible, not quiet" is the design.
