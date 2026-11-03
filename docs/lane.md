@@ -97,6 +97,36 @@ anything inside the space it owns; every change outside that space arrives as a
 record — a rotation with a signature, a lock rewrite, a diff — and what is not
 recorded is refused by arithmetic rather than by process.
 
+## Noise and security are complementary
+
+The layers above this one presume they provide **security**: they are asked whether
+a thing is allowed, and they answer. A refusal is binary, and a system that only
+refuses cannot tell you whether it refused the right thing — five layers that all say
+"no" are indistinguishable from five layers that are broken.
+
+The gate does a second job, and it is the one that makes the first legible: it
+produces **noise**. Every publication differs from the attested one in some
+particular way, and the difference is a measurement before it is an error — which
+artifact, which digest, which head, how far along the axis:
+
+```
+gate rejected: the published artifacts are not the version this cluster attested
+
+divergence (noise, not verdict):
+differs   certificate  attested 846a292a786d  published b09d486968e1
+
+  42i 42 + 20.0i (magnitude 46.5, rung 1, direction: boundary-violation)
+  verdict: drifted — 1 accepted violation(s) of scope-compliance; distance 20 from ground truth
+```
+
+That is the complement. Security is the door and it is either open or shut; noise is
+the bell, and it tells you somebody came through, from where, and how many rooms they
+are from the one you left them in. A guard that could only refuse would be silent
+when it mattered, and a measurement with nothing refusing behind it would be a
+dashboard. Neither is a substitute for the other, and the fixture deliberately keeps
+both: the refusal exits non-zero, and the report is written whether or not the
+refusal was deserved.
+
 ## Why zaphod's update is accepted and ACME's is not
 
 **Policy is not part of the model.** An earlier version of this file excused ACME

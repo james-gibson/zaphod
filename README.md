@@ -75,6 +75,11 @@ the lock and the pin, and produce something internally consistent. The cluster t
 attested state beside its identity secret and refuses a publication it never attested — even a
 self-consistent one signed with the key in the tree.
 
+The gate is deliberately two things at once, because they are complementary: **security** (a refusal,
+binary, non-zero exit) and **noise** (which artifact, which digest, which head, and how far off the
+axis — written whether or not the refusal was deserved). A guard that could only refuse is silent when
+it matters; a measurement with nothing refusing behind it is only a dashboard.
+
 ### Two questions, two layers
 
 A signature answers *who wrote this*. It cannot answer *is this the version we allowed* — and with a

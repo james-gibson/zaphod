@@ -87,7 +87,7 @@ cp -R . "$work/gate"
   scripts/allowed.sh --write >/dev/null
 
   if scripts/cluster-gate.sh >/dev/null 2>&1; then fail "gate present: a rewritten publication was accepted"; fi
-  perl -0pi -e 's/\[ "\$\(digest "\$path"\)" = "\$state_digest" \] \|\|/true ||/' scripts/cluster-gate.sh
+  perl -0pi -e 's/\[ "\$found" = "\$state_digest" \] \|\|/true ||/' scripts/cluster-gate.sh
   grep -q '^  true ||' scripts/cluster-gate.sh || fail "gate removal did not apply"
   scripts/cluster-gate.sh >/dev/null 2>&1 || fail "gate removed: still refused; the case does not test the gate"
 )

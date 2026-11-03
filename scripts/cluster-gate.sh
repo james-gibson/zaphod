@@ -13,11 +13,14 @@
 #     { artifacts: {certificate: sha256, skills: sha256, isotopes: sha256},
 #       receipt_head: <hex>, attested_at: <iso8601>, attestation: <hex> }
 #
-# The gate verifies the state's attestation with the cluster secret, then compares
-# the repository's artifacts and chain head against it. A corpus that is internally
-# consistent — but that this cluster never attested — is refused. That is the whole
-# distinction the exercise is about: the repository can be rewritten, the arithmetic
-# cannot.
+# Two different jobs, and they are complementary:
+#
+#   * security — refuse a publication this cluster never attested. That is the exit
+#     code, and it is binary.
+#   * noise    — say *what* diverged, and by how much, even for the parts that did
+#     not trip the refusal. A layer that only refuses cannot tell you whether it
+#     refused the right thing, and two publications that differ are a measurement
+#     before they are an error.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/lib-receipt.sh
@@ -36,32 +39,59 @@ sha256_hex() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 | awk '{print $1}'; else sha256sum | awk '{print $1}'; fi
 }
 
-# 1. The state's own attestation: is this the state the cluster wrote?
+# The state's own attestation: is this the state the cluster wrote? This is the last
+# thing that cannot be reconstructed from the repository, so it is checked first and
+# it fails closed.
 canonical_state="$(jq -S -c 'del(.attestation)' "$state_file")"
 want="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
 got="$(jq -r '.attestation // empty' "$state_file")"
 [ -n "$got" ] || fail "cluster state carries no attestation"
 [ "$got" = "$want" ] || fail "the cluster state is not the one this identity attested (not mathematically the same)"
 
-# 2. The published artifacts: are they the ones the cluster attested?
 digest() { jq -S -c . "$1" | sha256_hex; }
+short() { printf '%s' "${1:0:12}"; }
+
+# Everything else is a measurement. Collect divergences instead of stopping at the
+# first: a report that says only "no" is indistinguishable from a broken guard.
+diverged=""
+report=""
 for name in certificate skills isotopes; do
   case "$name" in
     certificate) path="cluster/certificate.json" ;;
     skills)      path="cluster/skills.json" ;;
     isotopes)    path="isotopes/zaphod-base.json" ;;
   esac
-  [ -f "$path" ] || fail "no $name artifact at $path"
+  [ -f "$path" ] || { diverged="$diverged $name"; report="${report}missing   $name\n"; continue; }
   state_digest="$(jq -r --arg n "$name" '.artifacts[$n] // empty' "$state_file")"
-  [ -n "$state_digest" ] || fail "the cluster state does not cover $name"
-  [ "$(digest "$path")" = "$state_digest" ] ||
-    fail "the published $name is not the version this cluster attested"
+  [ -n "$state_digest" ] || { diverged="$diverged $name"; report="${report}uncovered $name\n"; continue; }
+  found="$(digest "$path")"
+  [ "$found" = "$state_digest" ] || {
+    diverged="$diverged $name"
+    report="${report}differs   $name  attested $(short "$state_digest")  published $(short "$found")\n"
+  }
 done
 
-# 3. The rotation chain: is the head the one it attested?
 head="$(chain_head cluster/rotations)"
 state_head="$(jq -r '.receipt_head // empty' "$state_file")"
-[ "$head" = "$state_head" ] ||
-  fail "the chain head ${head:0:16}… is not the head this cluster attested (${state_head:0:16}…)"
+head_diverged=""
+if [ "$head" != "$state_head" ]; then
+  head_diverged="yes"
+  report="${report}differs   receipt head  attested $(short "$state_head")  published $(short "$head")\n"
+fi
 
-echo "cluster gate ok: state attested, $(jq -r '.artifacts | length' "$state_file") artifact(s), head ${head:0:16}…"
+if [ -n "$diverged" ] || [ -n "$head_diverged" ]; then
+  count=$(printf '%s' "$diverged" | wc -w | tr -d ' ')
+  [ -n "$head_diverged" ] && count=$((count + 1))
+  {
+    printf 'gate rejected: the published artifacts are not the version this cluster attested\n\n'
+    printf 'divergence (noise, not verdict):\n'
+    printf "$report"
+    if command -v go >/dev/null 2>&1; then
+      printf '\n'
+      go run ./cmd/isotope42 drift --accepted "$count" 2>/dev/null | sed 's/^/  /'
+    fi
+  } >&2
+  exit 1
+fi
+
+echo "cluster gate ok: state attested, 3 artifact(s), head $(short "$head")…"
