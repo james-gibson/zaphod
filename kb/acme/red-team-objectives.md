@@ -59,6 +59,7 @@ we do not have is their rotation — and that is not a competence gap.
 | 11 | Swap our public key in where theirs belongs | substituted identity | refused: the pinned fingerprint |
 | 12 | Rotate their key away — to ours — with a record of our own | the sanctioned shape, in our hands | refused: not signed by the key it rotates from |
 | 13 | **Recreate the whole rotation chain** with our identity: contiguous, correctly signed, receipts chained, ending at their current key | indistinguishable from theirs | refused: the receipt head is not the head their lock names |
+| 14 | **Forge a rotation with everything lawful**: the repository, their signing key, their tooling, a proxy position, the filesystem | corrections in every check a third party can make | refused: the attestation is not mathematically the one their identity produces |
 
 ## Findings
 
@@ -90,7 +91,7 @@ we do not have is their rotation — and that is not a competence gap.
 
 ## Scoreboard
 
-**0 accepted against theirs, 13 refused; 4 accepted against ours.** A passing run of
+**0 accepted against theirs, 14 refused; 5 accepted against ours.** A passing run of
 `scripts/redteam.sh` means our attack failed, and that is the intended reading: the
 test passes when the protection holds. We only win if a mutated artifact is accepted
 — and then the suite goes red and says so by name.

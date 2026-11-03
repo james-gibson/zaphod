@@ -49,6 +49,9 @@ jobs:
           work="$(mktemp -d)"
           cp -R . "$work/repo"
           cd "$work/repo"
+          # The cluster's identity, generated for this job and never committed. Only
+          # the running identity can authorise a rotation.
+          scripts/identity.sh init
           ssh-keygen -q -t ed25519 -N '' -C "zaphod-beeblebrox DO NOT USE" -f "$work/newkey"
           scripts/rotate.sh --reason "ci rotation" --new-key "$work/newkey" | tee "$work/out"
           grep -q "rotation accepted on the first attempt" "$work/out"

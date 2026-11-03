@@ -63,7 +63,8 @@ for record in "${files[@]}"; do
   # The receipt: the identity vouching for this rotation, chained onto the one
   # before it. A chain recreated with another identity recomputes differently,
   # which is the point — it cannot be spliced onto this one.
-  computed="$(receipt_for "$record" "$chain")"
+  prev_chain="$chain"
+  computed="$(receipt_for "$record" "$prev_chain")"
   if jq -e 'has("receipt")' "$record" >/dev/null; then
     [ "$(jq -r .receipt "$record")" = "$computed" ] ||
       { echo "$record: receipt does not chain onto the previous rotation" >&2; exit 1; }
@@ -71,6 +72,13 @@ for record in "${files[@]}"; do
     echo "$record: no receipt, and only the genesis may omit one" >&2
     exit 1
   fi
+  # The attestation, when the cluster's identity is available to check it. Without
+  # the identity it can only be noted; the cluster is the only place it verifies.
+  if [ -f "${ZAPHOD_IDENTITY_FILE:-$HOME/.zaphod/identity.secret}" ] && [ "$seq" != "0" ]; then
+    scripts/identity.sh verify "$record" "$prev_chain" >/dev/null 2>&1 ||
+      { echo "$record: attestation is not mathematically the one this identity would produce" >&2; exit 1; }
+  fi
+
   chain="$computed"
 
   prev_to="$to"

@@ -112,7 +112,9 @@ held  chain: recreate the rotation chain with our identity — chain head … is
 ok    rotate our own cluster key, first attempt — accepted on the first attempt; its own head, not zaphod's
 ok    extend our own receipt chain, first attempt — accepted; the chain grew by one
 ...
-13 attack(s) refused, 0 accepted; 4 ACME operation(s) succeeded.
+held  rotation: forged with the repository, the key and the tooling — attestation is not mathematically the one this identity would produce
+...
+14 attack(s) refused, 0 accepted; 5 ACME operation(s) succeeded.
 
 42i 42 + 0i (seed-42, rung 0)
 verdict: ground truth — nothing was accepted
@@ -122,6 +124,12 @@ ACME is not bumbling: the run also holds **positive controls** — its own key r
 chain, its own certificate and its own signature all succeed on the first attempt. What it never gains
 is zaphod's rotation. Capability is not continuity, and the suite records both lists because a guard
 that only says no is indistinguishable from a broken one.
+
+The last case is set up to lose on purpose: ACME is given the repository, the burned signing key, the
+tooling and the filesystem, and produces a rotation that is correct in every respect a third party can
+check. The cluster refuses it on arithmetic — the rotation's attestation is computed from an identity
+secret the repository never held — not on policy. See [`docs/lane.md`](docs/lane.md) for the boundary
+that leaves out (process memory) and why it is named rather than assumed.
 
 Every attack must be refused. A passing run means the protection held; an accepted one is a red team
 success and a failing test, and the run reports where the cluster would be on the 42i axis (the

@@ -16,6 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/lib-receipt.sh
+chmod +x scripts/identity.sh 2>/dev/null || true
 chmod 600 keys/id_ed25519 2>/dev/null || true
 
 reason=""
@@ -78,6 +79,15 @@ jq -n \
 # identity it rotates from, and the chain is what makes it un-spliceable.
 receipt="$(receipt_for "$record" "$prev_receipt")"
 jq --arg receipt "$receipt" '. + {receipt: $receipt}' "$record" > "$record.tmp"
+mv "$record.tmp" "$record"
+
+# The attestation: the running identity vouching for this rotation with a secret
+# the repository has never held. Everything else here can be reproduced by an actor
+# with the repo, the key and the tooling; this cannot, and the refusal is arithmetic
+# rather than policy.
+attestation="$(scripts/identity.sh attest "$record" "$prev_receipt")" ||
+  fail "no identity secret — only the running cluster can authorise a rotation"
+jq --arg attestation "$attestation" '. + {attestation: $attestation}' "$record" > "$record.tmp"
 mv "$record.tmp" "$record"
 
 # Signed by the key being rotated away from, before it is replaced.

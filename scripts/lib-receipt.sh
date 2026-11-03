@@ -32,7 +32,7 @@ receipt_for() {
   local record="$1" previous="$2"
   local from canonical
   from="$(jq -r .from "$record")"
-  canonical="$(jq -S -c 'del(.receipt)' "$record")"
+  canonical="$(jq -S -c 'del(.receipt) | del(.attestation)' "$record")"
   printf '%s' "zaphod-rotation-v1:${from}:${canonical}:${previous}" | sha256_hex
 }
 

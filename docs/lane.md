@@ -14,6 +14,7 @@ being unable to produce a valid signature. It can. It does, in
 | allowed version (`cluster/allowed.txt`) | *is this the version we allowed?* | a valid signature over a widened certificate is still a widened certificate |
 | rotation chain (`cluster/rotations/`) | *was this update sanctioned?* | the key is public, so "signed by the allowed key" is available to everyone |
 | receipt (`chain/rotations/*.receipt`, head in the lock) | *did this rotation come back onto the same identity?* | a chain recreated with another identity is a different chain, and no signature on it says otherwise |
+| attestation (`attestation` field, checked by the cluster) | *did the running identity authorise it?* | the signing key is public, so a signature cannot answer this; the secret was never in the repository |
 
 The three are independent, and the tests prove each one is load-bearing:
 `scripts/teeth.sh` removes them one at a time in a throwaway copy and requires the
@@ -34,6 +35,39 @@ and the head is in zaphod's lock. That is why the red team's wins and losses are
 recorded together — the interesting fact is not that attempts fail, it is that the
 one that should succeed for a competent actor does, and the rotation still does not
 transfer.
+
+## Set up to lose
+
+The most interesting version of this test gives ACME everything a lawful adversary
+could have: the repository, the **burned signing key**, the tooling, a proxy
+position, and the filesystem the cluster's artifacts live on. No policy exemption,
+no excluded credential. Under that model ACME produces a rotation that is correct in
+every respect a third party can check — signature, public receipt chain, contiguous
+history, coherent lock — and the cluster still refuses it:
+
+```
+held  rotation: forged with the repository, the key and the tooling — attestation is not mathematically the one this identity would produce
+```
+
+The refusal is arithmetic. A rotation carries an `attestation` computed from the
+cluster's **identity secret**, which lives in the running identity and is never
+written into the repository or handed to the artifacts:
+
+```
+attestation = SHA256(secret ":" canonical(rotation) ":" previous-receipt)
+```
+
+Everything an actor can obtain from the repository, the key and the tooling cannot
+compute that value, so a forged rotation is not "unauthorised" — it is *wrong*, and
+the check says so. The identity's own rotation is attested and accepted on the first
+attempt, which the suite also asserts, so the guard is not simply refusing.
+
+**The boundary, stated rather than implied.** This models access to the repository,
+the signing key, the tooling, the artifacts and the filesystem. It does not model
+reading a running process's memory. A secret in memory is a real boundary — a proxy
+hop cannot read it, and neither can a file copy — but it is not an absolute one, and
+`scripts/identity.sh` says so at the top rather than letting the demonstration imply
+more than it proves.
 
 ## The lane
 

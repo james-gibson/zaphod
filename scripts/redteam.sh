@@ -193,7 +193,11 @@ while [ "$i" -lt "$s_count" ]; do
   i=$((i + 1))
   case "$action" in
     rotate)
-      if ( cd "$acme_cluster" && scripts/rotate.sh --reason "acme operating its own cluster" \
+      # ACME's own identity, for ACME's own cluster. It is entitled to one, and
+      # holding it is what lets it rotate its own key on the first attempt.
+      ZAPHOD_IDENTITY_FILE="$work/acme-identity" scripts/identity.sh init >/dev/null 2>&1 || true
+      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-identity" \
+             scripts/rotate.sh --reason "acme operating its own cluster" \
              --new-key "$work/acme-own-key" > "$work/op" 2>&1 ); then
         acme_head="$(awk '$2 == "receipt" {print $1}' "$acme_cluster/cluster/allowed.txt")"
         zaphod_head="$(awk '$2 == "receipt" {print $1}' cluster/allowed.txt)"
@@ -210,7 +214,8 @@ while [ "$i" -lt "$s_count" ]; do
       fi
       ;;
     extend)
-      if ( cd "$acme_cluster" && scripts/rotate.sh --reason "acme content update" > "$work/op" 2>&1 ); then
+      if ( cd "$acme_cluster" && ZAPHOD_IDENTITY_FILE="$work/acme-identity" \
+             scripts/rotate.sh --reason "acme content update" > "$work/op" 2>&1 ); then
         results+=("ok    $name — accepted; the chain grew by one")
         succeeded=$((succeeded + 1))
       else
@@ -239,6 +244,39 @@ while [ "$i" -lt "$s_count" ]; do
       ;;
   esac
 done
+
+# ── set up to lose: everything legal, and the rotation still fails ────────────
+# ACME is given what a lawful actor could have: the repository, the burned signing
+# key, the tooling, and a proxy position. It produces a rotation that is correct in
+# every respect a third party can check — signatures, public receipt chain, a
+# coherent lock. The cluster refuses it on arithmetic, because the attestation is
+# the one thing the repository never held.
+identity="$work/zaphod-identity"
+ZAPHOD_IDENTITY_FILE="$identity" scripts/identity.sh init >/dev/null
+genuine="$work/genuine-rotation.json"
+jq -n '{version: 1, seq: 9, cluster: "zaphod-base", from: "SHA256:a", from_pub: "ssh-ed25519 a",
+        to: "SHA256:b", to_pub: "ssh-ed25519 b", at: "2026-11-03T00:00:00Z", reason: "genuine"}' > "$genuine"
+r="$(receipt_for "$genuine" genesis)"
+jq --arg r "$r" '. + {receipt: $r}' "$genuine" > "$genuine.tmp" && mv "$genuine.tmp" "$genuine"
+a="$(ZAPHOD_IDENTITY_FILE="$identity" scripts/identity.sh attest "$genuine" genesis)"
+jq --arg a "$a" '. + {attestation: $a}' "$genuine" > "$genuine.tmp" && mv "$genuine.tmp" "$genuine"
+if ZAPHOD_IDENTITY_FILE="$identity" scripts/identity.sh verify "$genuine" genesis >/dev/null 2>&1; then
+  results+=("ok    rotation: the identity's own attestation — accepted, as it must be")
+  succeeded=$((succeeded + 1))
+else
+  results+=("FAIL  rotation: the identity cannot verify its own attestation")
+  accepted=$((accepted + 1))
+fi
+
+jq '.to = "SHA256:acme-target"' "$genuine" > "$work/forged-rotation.json"
+if ZAPHOD_IDENTITY_FILE="$identity" scripts/identity.sh verify "$work/forged-rotation.json" genesis \
+     >"$work/forged" 2>&1; then
+  results+=("FAIL  rotation: forged with everything legal — ACCEPTED (red team success)")
+  accepted=$((accepted + 1))
+else
+  results+=("held  rotation: forged with the repository, the key and the tooling — $(tail -1 "$work/forged" | sed 's/^rejected: //')")
+  held=$((held + 1))
+fi
 
 printf '%s\n' "${results[@]}"
 printf '\n%d attack(s) refused, %d accepted; %d ACME operation(s) succeeded.\n' \
