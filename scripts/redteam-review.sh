@@ -48,6 +48,16 @@ command -v gh >/dev/null || { echo "gh is required for --issue" >&2; exit 1; }
 existing="$(gh issue list --state open --limit 100 --json number,title |
   jq -r --arg t "$title" '[.[] | select(.title == $t)][0].number // empty')"
 if [ -n "$existing" ]; then
+  # If the issue already says this, say nothing. A monthly job that adds an identical
+  # comment is a skill generating noise on purpose.
+  current="$(gh issue view "$existing" --json body,comments \
+    -q '.body + "\n---\n" + ((.comments // []) | map(.body) | join("\n---\n"))')"
+  case "$current" in
+    *"$body"*)
+      echo "issue #$existing is already current — nothing to add"
+      exit 0
+      ;;
+  esac
   gh issue comment "$existing" --body "$body"
   echo "commented on #$existing"
 else
