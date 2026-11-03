@@ -70,7 +70,9 @@ somebody likes.
 - `car-park` — transforms a vehicle into space;
 - `gaffe-log` — never edits or deletes an entry;
 - `acme-correspondence` — never opens the letters;
-- `cabinet` — never confirms the ministry exists.
+- `cabinet` — never confirms the ministry exists;
+- `redteam-review` — transforms the attack corpus into a review request, once a month;
+  the only skill whose output is a question rather than an answer.
 
 ## A rung is computed, not voted
 

@@ -111,6 +111,22 @@ Re-signs the artifacts, appends a rotation record signed by the key it rotates *
 `keys/`, rewrites the lock — and verifies all of it before saying so. **Accepted on the first
 attempt**, with no manual edits. Without `--new-key` it is a content update with the same key.
 
+### The corpus asks for more
+
+A corpus that stops growing is a corpus that has stopped looking. `zaphod/channel/redteam-review`
+is a skill whose contract is `transforms [attack corpus] → [review request]`: on the first of every
+month it asks the adversary what has become thinkable since the last run, and opens or refreshes
+[the request](https://github.com/james-gibson/zaphod/issues?q=label%3Aredteam) in the
+`redteam` label.
+
+```sh
+scripts/redteam-review.sh          # the request, on stdout
+scripts/redteam-review.sh --issue  # post it (monthly in CI, and on demand)
+```
+
+It lists what is already covered, what `redteam/acme/attempts.json` still wants, and the shape of
+an entry — so "attacks have evolved" is a checklist somebody can act on rather than a sentiment.
+
 ### ACME's red team
 
 `redteam/acme/attempts.json` is ACME's: they may add attempts, change mutations, choose a signing key.

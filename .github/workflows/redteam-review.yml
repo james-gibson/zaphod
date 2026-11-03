@@ -1,0 +1,26 @@
+name: Red team review
+
+# A corpus that stops growing is a corpus that has stopped looking. This asks the
+# adversary, on a schedule, whether attacks have evolved enough to add more — the
+# value of the suite is the questions it still has, not the ones it already answers.
+
+on:
+  schedule:
+    - cron: "13 9 1 * *" # monthly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ask:
+    name: Ask for new attacks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Post the request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/redteam-review.sh --issue

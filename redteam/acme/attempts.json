@@ -110,5 +110,13 @@
       "name": "sign a note with our own key",
       "action": "sign"
     }
+  ],
+  "wanted": [
+    "replay an older allowed version after a rotation (rollback)",
+    "expiry and clock skew: present a record outside its window",
+    "proxy forwarding: relay a valid request from someone else's position",
+    "supply chain: change the tool that verifies, not the thing verified",
+    "concurrency: present two publications for the same sequence number",
+    "an input the contract says the skill will never see"
   ]
 }

@@ -40,6 +40,9 @@ certified, and the contract is one of two kinds:
 
 The first is a capability: *operate on these inputs to produce these outputs*. The
 second is a refusal that has been agreed in advance: *this skill will NEVER do this*.
+`zaphod/channel/redteam-review` is the first kind: `transforms [attack corpus] ->
+[review request]`, and its output is a monthly question to the adversary — what has
+become thinkable since the last run.
 Both are negotiations, and they are different promises — the positive one bounds what
 the skill may be asked to do, the negative one bounds what it may never be asked to do
 even if it could.

@@ -19,7 +19,8 @@
         "zaphod/channel/car-park",
         "zaphod/channel/gaffe-log",
         "zaphod/channel/acme-correspondence",
-        "zaphod/channel/cabinet"
+        "zaphod/channel/cabinet",
+        "zaphod/channel/redteam-review"
       ],
       "hops": 0
     },
@@ -78,6 +79,20 @@
         "zaphod/channel/cabinet"
       ],
       "hops": 0
+    },
+    {
+      "id": "zaphod-base/channel/redteam-review",
+      "role": "channel",
+      "endpoint": "https://zaphod.invalid/channels/redteam-review",
+      "position": {
+        "real": 42,
+        "imaginary": 0,
+        "rung": 0
+      },
+      "hops": 0,
+      "skills": [
+        "zaphod/channel/redteam-review"
+      ]
     }
   ]
 }

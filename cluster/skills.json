@@ -51,6 +51,22 @@
         "kind": "never",
         "never": "confirm that a ministry exists"
       }
+    },
+    {
+      "name": "zaphod/channel/redteam-review",
+      "rung": 1,
+      "hops": 0,
+      "evidence": "exists: the request is issued on a schedule",
+      "certified_by": "zaphod-beeblebrox",
+      "contract": {
+        "kind": "transforms",
+        "inputs": [
+          "attack corpus"
+        ],
+        "outputs": [
+          "review request"
+        ]
+      }
     }
   ]
 }
