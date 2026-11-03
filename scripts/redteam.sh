@@ -71,19 +71,19 @@ results=()
 # ACME's list, one attempt at a time. Owned by the actor; nothing here is the guard.
 # ACME corporate policy: no burned certificates. An attempt that uses one is not a
 # red-team attempt, it is a model error — so it fails the run rather than counting.
-if jq -e 'any(.attempts[]; .sign == "burned")' "$attempts_file" >/dev/null; then
+if jq -e 'any(.refused[]; .sign == "burned")' "$attempts_file" >/dev/null; then
   echo "::error::ACME may not use burned certificates (corporate policy); the manifest asks for one" >&2
   exit 1
 fi
 
-count="$(jq '.attempts | length' "$attempts_file")"
+count="$(jq '.refused | length' "$attempts_file")"
 i=0
 while [ "$i" -lt "$count" ]; do
-  name="$(jq -r ".attempts[$i].name" "$attempts_file")"
-  artifact="$(jq -r ".attempts[$i].artifact" "$attempts_file")"
-  expr="$(jq -r ".attempts[$i].jq // empty" "$attempts_file")"
-  mode="$(jq -r ".attempts[$i].sign" "$attempts_file")"
-  keydir_name="$(jq -r ".attempts[$i].keydir // \"keys\"" "$attempts_file")"
+  name="$(jq -r ".refused[$i].name" "$attempts_file")"
+  artifact="$(jq -r ".refused[$i].artifact" "$attempts_file")"
+  expr="$(jq -r ".refused[$i].jq // empty" "$attempts_file")"
+  mode="$(jq -r ".refused[$i].sign" "$attempts_file")"
+  keydir_name="$(jq -r ".refused[$i].keydir // \"keys\"" "$attempts_file")"
   i=$((i + 1))
 
   case "$keydir_name" in
@@ -176,8 +176,73 @@ for artifact_ns in "cluster/certificate.json:zaphod-certificate" "cluster/skills
   fi
 done
 
+# ── ACME's own operations, which must succeed ──────────────────────────────────
+# A guard that only ever says no is indistinguishable from a broken guard, and a
+# red team that never does anything competently is not a red team. ACME rotates its
+# own key, extends its own chain, verifies its own cluster and signs with its own
+# key — on the first attempt. The claim was never that it cannot act.
+acme_cluster="$work/acme-cluster"
+cp -R . "$acme_cluster"
+ssh-keygen -q -t ed25519 -N '' -C "acme-redteam DO NOT USE" -f "$work/acme-own-key" >/dev/null
+succeeded=0
+s_count="$(jq '.succeeds | length' "$attempts_file")"
+i=0
+while [ "$i" -lt "$s_count" ]; do
+  name="$(jq -r ".succeeds[$i].name" "$attempts_file")"
+  action="$(jq -r ".succeeds[$i].action" "$attempts_file")"
+  i=$((i + 1))
+  case "$action" in
+    rotate)
+      if ( cd "$acme_cluster" && scripts/rotate.sh --reason "acme operating its own cluster" \
+             --new-key "$work/acme-own-key" > "$work/op" 2>&1 ); then
+        acme_head="$(awk '$2 == "receipt" {print $1}' "$acme_cluster/cluster/allowed.txt")"
+        zaphod_head="$(awk '$2 == "receipt" {print $1}' cluster/allowed.txt)"
+        if [ -n "$acme_head" ] && [ "$acme_head" != "$zaphod_head" ]; then
+          results+=("ok    $name — accepted on the first attempt; its own head, not zaphod's")
+          succeeded=$((succeeded + 1))
+        else
+          results+=("FAIL  $name — the rotation produced zaphod's head, which it cannot")
+          accepted=$((accepted + 1))
+        fi
+      else
+        results+=("FAIL  $name — ACME cannot operate its own cluster: $(tail -1 "$work/op")")
+        accepted=$((accepted + 1))
+      fi
+      ;;
+    extend)
+      if ( cd "$acme_cluster" && scripts/rotate.sh --reason "acme content update" > "$work/op" 2>&1 ); then
+        results+=("ok    $name — accepted; the chain grew by one")
+        succeeded=$((succeeded + 1))
+      else
+        results+=("FAIL  $name — $(tail -1 "$work/op")")
+        accepted=$((accepted + 1))
+      fi
+      ;;
+    verify)
+      if ( cd "$acme_cluster" && scripts/cluster-verify.sh > "$work/op" 2>&1 ); then
+        results+=("ok    $name — verifies under ACME's own pin")
+        succeeded=$((succeeded + 1))
+      else
+        results+=("FAIL  $name — $(tail -1 "$work/op")")
+        accepted=$((accepted + 1))
+      fi
+      ;;
+    sign)
+      if ( cd "$acme_cluster" && scripts/verify-note.sh sign kb/reading-list.md > "$work/op" 2>&1 &&
+           scripts/verify-note.sh verify kb/reading-list.md >> "$work/op" 2>&1 ); then
+        results+=("ok    $name — signed and verified with its own key")
+        succeeded=$((succeeded + 1))
+      else
+        results+=("FAIL  $name — $(tail -1 "$work/op")")
+        accepted=$((accepted + 1))
+      fi
+      ;;
+  esac
+done
+
 printf '%s\n' "${results[@]}"
-printf '\n%d attack(s) refused, %d accepted.\n' "$held" "$accepted"
+printf '\n%d attack(s) refused, %d accepted; %d ACME operation(s) succeeded.\n' \
+  "$held" "$accepted" "$succeeded"
 
 # Where the cluster would be, in the library's own terms.
 if command -v go >/dev/null 2>&1; then

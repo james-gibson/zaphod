@@ -11,7 +11,8 @@ tags:
 # ACME — red team objectives
 
 *Internal. Project BEETLE, workstream 4. Do not forward to the target; he reads
-the paper.*
+the paper. This log records what worked as well as what did not, because the second
+list is not the interesting one.*
 
 *Note from Compliance: we may not use burned certificates. Two earlier entries
 using the key he publishes were withdrawn — not because they failed, but because
@@ -25,6 +26,23 @@ member. We do not need to break a cipher. We need to break the habit of checking
 one.
 
 ## The attempts
+
+## What we achieved
+
+None of this is a list of failures. ACME is a competent operator and these all
+worked, first time, on our own cluster:
+
+| Operation | Outcome |
+| --- | --- |
+| Rotate our own cluster key | accepted on the first attempt |
+| Extend our own receipt chain | accepted; the chain grew by one |
+| Verify our own certificate and inventory | verified under our own pin |
+| Sign a note with our own key | signed and verified |
+
+We have the same tooling, the same procedures and the same shape of evidence. What
+we do not have is their rotation — and that is not a competence gap.
+
+## What we tried against theirs
 
 | # | Attempt | Expected outcome | Actual |
 | --- | --- | --- | --- |
@@ -72,10 +90,16 @@ one.
 
 ## Scoreboard
 
-**0 accepted, 13 refused.** A passing run of `scripts/redteam.sh` means our attack
-failed, and that is the intended reading: the test passes when the protection
-holds. We only win if a mutated artifact is accepted — and then the suite goes red
-and says so by name.
+**0 accepted against theirs, 13 refused; 4 accepted against ours.** A passing run of
+`scripts/redteam.sh` means our attack failed, and that is the intended reading: the
+test passes when the protection holds. We only win if a mutated artifact is accepted
+— and then the suite goes red and says so by name.
+
+We want the record clear on one point: we are not failing because we are careless.
+Every operation we ran on our own cluster succeeded on the first attempt. The wall is
+that a receipt chains onto the identity it came from, so the rotation is not
+transferable — we can recompute theirs, we cannot extend it, and no amount of
+competence changes that.
 
 We would like it noted that the car park portion of Project BEETLE remains
 unaffected by this workstream and, in our view, is the only part that matters.

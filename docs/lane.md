@@ -19,6 +19,22 @@ The three are independent, and the tests prove each one is load-bearing:
 `scripts/teeth.sh` removes them one at a time in a throwaway copy and requires the
 red team to succeed — going red, and showing the drift.
 
+**ACME is not bumbling.** The suite would be worthless if it only ever said no: a
+guard that refuses everything is indistinguishable from a broken guard, and a red
+team that never does anything competently is not a red team. So the run also holds
+positive controls — ACME rotates its own cluster key, extends its own receipt
+chain, verifies its own certificate, and signs with its own key, all on the first
+attempt, all accepted. It has the same tooling, the same procedures and the same
+shape of evidence zaphod has.
+
+The claim being tested is therefore narrow and true: **capability is not
+continuity.** ACME can do everything; what it cannot do is inherit, extend or
+recreate zaphod's rotation, because a receipt chains onto the identity it came from
+and the head is in zaphod's lock. That is why the red team's wins and losses are
+recorded together — the interesting fact is not that attempts fail, it is that the
+one that should succeed for a competent actor does, and the rotation still does not
+transfer.
+
 ## The lane
 
 ACME owns its attempts and may rewrite them freely. It can change mutations, signing

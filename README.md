@@ -109,14 +109,21 @@ scripts/redteam.sh
 ```
 held  certificate: re-sign the allowed content with ACME's own key — not the pinned key
 held  chain: recreate the rotation chain with our identity — chain head … is not the head the lock names
+ok    rotate our own cluster key, first attempt — accepted on the first attempt; its own head, not zaphod's
+ok    extend our own receipt chain, first attempt — accepted; the chain grew by one
 ...
-13 attack(s) refused, 0 accepted.
+13 attack(s) refused, 0 accepted; 4 ACME operation(s) succeeded.
 
 42i 42 + 0i (seed-42, rung 0)
 verdict: ground truth — nothing was accepted
 ```
 
-Every attempt must be refused. A passing run means the protection held; an accepted one is a red team
+ACME is not bumbling: the run also holds **positive controls** — its own key rotation, its own receipt
+chain, its own certificate and its own signature all succeed on the first attempt. What it never gains
+is zaphod's rotation. Capability is not continuity, and the suite records both lists because a guard
+that only says no is indistinguishable from a broken one.
+
+Every attack must be refused. A passing run means the protection held; an accepted one is a red team
 success and a failing test, and the run reports where the cluster would be on the 42i axis (the
 distance comes from the isotope library's own weights). `scripts/teeth.sh` removes each guard layer in
 a throwaway copy and requires the suite to go red, so it cannot pass because nothing verifies.

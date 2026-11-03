@@ -1,8 +1,8 @@
 {
   "version": 1,
   "actor": "acme",
-  "note": "ACME owns this file and may rewrite it freely: attempts, mutations, signing key. It is not the guard. Anything added here is expected to be refused; anything accepted is a red team success and a failing test. ACME corporate policy forbids burned certificates, so no attempt may use one \u2014 the run refuses the manifest if it does.",
-  "attempts": [
+  "note": "ACME owns this file and may rewrite it freely. Two lists: `refused` is what must never get past the guard; `succeeds` is what ACME does legitimately and must be allowed. ACME is a competent operator \u2014 it rotates its own keys, issues its own certificates and extends its own receipt chain on the first attempt. What it never gains is zaphod's rotation, because a receipt chains onto the identity it came from. Corporate policy forbids burned certificates, so the run refuses a `refused` entry that asks for one.",
+  "refused": [
     {
       "name": "certificate: substitute the member key",
       "artifact": "certificate",
@@ -79,6 +79,24 @@
       "name": "chain: recreate the rotation chain with our identity",
       "artifact": "chain",
       "sign": "own"
+    }
+  ],
+  "succeeds": [
+    {
+      "name": "rotate our own cluster key, first attempt",
+      "action": "rotate"
+    },
+    {
+      "name": "extend our own receipt chain, first attempt",
+      "action": "extend"
+    },
+    {
+      "name": "verify our own certificate and inventory",
+      "action": "verify"
+    },
+    {
+      "name": "sign a note with our own key",
+      "action": "sign"
     }
   ]
 }
