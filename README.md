@@ -11,6 +11,8 @@ for anything but a test.
 - keys and the fingerprint guard → [`keys/`](keys/) · [`scripts/guard-keys.sh`](scripts/guard-keys.sh)
 - the knowledge base → [`kb/`](kb/)
 - recurring exercises → [`.github/workflows/`](.github/workflows/) · [`docs/exercise.md`](docs/exercise.md)
+- the cluster certificate and skill inventory → [`cluster/`](cluster/)
+- ACME's red team, as a test → [`scripts/redteam.sh`](scripts/redteam.sh)
 - encrypted notes → a **release asset**, not a file in this repo
 - everything here is fiction → [`NOTICE`](NOTICE)
 
@@ -44,6 +46,46 @@ Sign and verify with the committed pair:
 ssh-keygen -Y sign -f keys/id_ed25519 -n zaphod-note notes.md      # writes notes.md.sig
 ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
   -n zaphod-note -s notes.md.sig < notes.md
+```
+
+## Cluster and red team
+
+`cluster/` holds the two artifacts that say what this cluster is and what it may
+do:
+
+- `certificate.json` — issued by `zaphod-beeblebrox`, granting scope `attest,registry`;
+- `skills.json` — one skill per published channel with the rung it has earned
+  (0 declared → 3 scenario-linked), and `hops` for how far the certifier is.
+
+Both carry a detached signature over `jq -S -c` of the file, so reformatting is
+harmless and editing a value is fatal. `scripts/cluster-verify.sh` checks the
+signatures, the pin, and that the skills belong to the certified cluster.
+
+```sh
+scripts/cluster-verify.sh
+```
+
+The certificate is what admits a member, so it is what ACME attacks. Their ten
+attempts — substitute a key, widen the scope, extend the expiry, re-issue as
+themselves, promote a skill, sign with their own key, swap the public key — are a
+test, not a scenario:
+
+```sh
+scripts/redteam.sh
+```
+
+Every attempt must be **refused**. A passing run means the protection held; a
+mutation that gets through is a red team success and a failing test, and the
+suite says which one got in. It ends by re-verifying the genuine artifacts, so it
+cannot pass because verification is broken in general.
+
+```sh
+$ scripts/redteam.sh
+held  certificate: substitute the member key — bad signature
+held  key: sign a widened certificate with ACME's own key — signed by SHA256:y501…, which is not the pinned key
+...
+10 attack(s) refused, 0 accepted.
+protection held: every tampered certificate and skill inventory was refused
 ```
 
 ## Encrypted notes

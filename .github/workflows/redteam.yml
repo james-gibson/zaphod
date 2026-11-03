@@ -1,0 +1,54 @@
+name: Red team
+
+# The protection is only worth what its worst-tested case says it is worth, so the
+# mutation suite runs on every push, on a timer, and on demand. A passing run
+# means every tampered certificate and skill inventory was refused.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protect:
+    name: ACME cannot edit their way in
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq and age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq age
+
+      - name: The genuine artifacts verify
+        run: scripts/cluster-verify.sh
+
+      - name: Every tampered artifact is refused
+        run: scripts/redteam.sh
+
+      # A suite that passes because nothing verifies is worse than no suite. Pin
+      # the failure mode: with the pin check removed the ACME-signed certificate
+      # must be accepted and the suite must go red, naming the attack.
+      - name: The suite fails when the protection is removed
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp -R . "$work/repo"
+          cd "$work/repo"
+          # Drop the fingerprint comparison from the verifier.
+          perl -0pi -e 's/\[ "\$signer" = "\$pin" \] \|\| fail .*/true/' scripts/verify-artifact.sh
+          if scripts/redteam.sh > "$work/out" 2>&1; then
+            echo "::error::redteam.sh passed with the pin check removed; the suite proves nothing"
+            cat "$work/out"
+            exit 1
+          fi
+          grep -q "RED TEAM SUCCEEDED" "$work/out" || {
+            echo "::error::removing the pin did not produce a named red team success"
+            cat "$work/out"
+            exit 1
+          }
+          echo "the suite goes red, and names the attack, when the pin is removed"

@@ -13,7 +13,8 @@ Everything here is fiction; see [`../NOTICE`](../NOTICE).
 | Folder | What is in it |
 | --- | --- |
 | [`politics/`](politics/) | the campaign that will not end, the gaffes it produced, and the cabinet he keeps meaning to announce |
-| [`acme/`](acme/) | correspondence from ACME Corporation about a hostile takeover of a company he believes he owns |
+| [`acme/`](acme/) | correspondence from ACME Corporation about a hostile takeover of a company he believes he owns, and their attempt to be admitted to his cluster |
+| [`cluster/`](cluster/) | the dynamic skills his channels expose, and the rungs they have actually earned |
 | [`reading-list.md`](reading-list.md) | books he has been recommended and has not read |
 
 The notes are deliberately inconsistent. He rewrites the manifesto whenever he

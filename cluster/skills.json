@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cluster": "zaphod-base",
+  "issuer": "zaphod-beeblebrox",
+  "skills": [
+    {
+      "name": "zaphod/channel/car-park",
+      "rung": 2,
+      "hops": 0,
+      "evidence": "deterministic: two runs, same output",
+      "certified_by": "zaphod-beeblebrox"
+    },
+    {
+      "name": "zaphod/channel/gaffe-log",
+      "rung": 2,
+      "hops": 0,
+      "evidence": "deterministic: the log is append-only, and appending twice is refused",
+      "certified_by": "zaphod-beeblebrox"
+    },
+    {
+      "name": "zaphod/channel/acme-correspondence",
+      "rung": 1,
+      "hops": 0,
+      "evidence": "exists: the folder answers, nothing more is claimed",
+      "certified_by": "zaphod-beeblebrox"
+    },
+    {
+      "name": "zaphod/channel/cabinet",
+      "rung": 0,
+      "hops": 0,
+      "evidence": "declared only: the office will not confirm the ministry exists",
+      "certified_by": "zaphod-beeblebrox"
+    }
+  ]
+}

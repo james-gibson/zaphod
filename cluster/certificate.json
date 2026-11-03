@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cluster": "zaphod-base",
+  "issuer": "zaphod-beeblebrox",
+  "subject": "zaphod-base/edge-01",
+  "subject_fingerprint": "SHA256:YzfLqN67xkxrW/BxBnrVTSNDIzrpDEYt0/Twc8jUjOo",
+  "scope": [
+    "attest",
+    "registry"
+  ],
+  "not_after": 2051222400
+}
