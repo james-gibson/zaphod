@@ -15,6 +15,7 @@
 # secret to keep this honest.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/lib-receipt.sh
 chmod 600 keys/id_ed25519 2>/dev/null || true
 
 reason=""
@@ -57,6 +58,9 @@ else
   new_fp="$old_fp"
 fi
 
+# The head of the chain *before* this record exists: the receipt links to it.
+prev_receipt="$(chain_head cluster/rotations)"
+
 last="$(ls cluster/rotations/*.json | sort | tail -1)"
 seq=$(( $(jq -r .seq "$last") + 1 ))
 record="$(printf 'cluster/rotations/%03d-rotation.json' "$seq")"
@@ -69,6 +73,12 @@ jq -n \
   '{version: 1, seq: $seq, cluster: "zaphod-base",
     from: $from, from_pub: $from_pub, to: $to, to_pub: $to_pub,
     at: $at, reason: $reason}' > "$record"
+
+# The receipt, chained onto the previous one: a rotation is vouched for by the
+# identity it rotates from, and the chain is what makes it un-spliceable.
+receipt="$(receipt_for "$record" "$prev_receipt")"
+jq --arg receipt "$receipt" '. + {receipt: $receipt}' "$record" > "$record.tmp"
+mv "$record.tmp" "$record"
 
 # Signed by the key being rotated away from, before it is replaced.
 tmp="$(mktemp)"

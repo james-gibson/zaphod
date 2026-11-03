@@ -12,8 +12,9 @@
 # key, so "correctly signed" is not a distinguishing property. A record is.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/lib-receipt.sh
 
-dir="cluster/rotations"
+dir="${ZAPHOD_ROTATIONS:-cluster/rotations}"
 [ -d "$dir" ] || { echo "no rotation chain at $dir" >&2; exit 1; }
 
 mapfile_supported=1
@@ -28,6 +29,7 @@ fp_of() { ssh-keygen -lf "$1" | awk '{print $2}'; }
 
 expected_seq=0
 prev_to=""
+chain="genesis"
 last_to=""
 for record in "${files[@]}"; do
   jq -e . "$record" >/dev/null 2>&1 || { echo "$record is not JSON" >&2; exit 1; }
@@ -58,6 +60,19 @@ for record in "${files[@]}"; do
   signer="$(printf '%s' "$verdict" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p')"
   [ "$signer" = "$from" ] || { echo "$record: signed by $signer, rotates from $from" >&2; exit 1; }
 
+  # The receipt: the identity vouching for this rotation, chained onto the one
+  # before it. A chain recreated with another identity recomputes differently,
+  # which is the point — it cannot be spliced onto this one.
+  computed="$(receipt_for "$record" "$chain")"
+  if jq -e 'has("receipt")' "$record" >/dev/null; then
+    [ "$(jq -r .receipt "$record")" = "$computed" ] ||
+      { echo "$record: receipt does not chain onto the previous rotation" >&2; exit 1; }
+  elif [ "$seq" != "0" ]; then
+    echo "$record: no receipt, and only the genesis may omit one" >&2
+    exit 1
+  fi
+  chain="$computed"
+
   prev_to="$to"
   last_to="$to"
   expected_seq=$((expected_seq + 1))
@@ -69,4 +84,12 @@ current="$(fp_of keys/id_ed25519.pub)"
 [ "$(awk '{print $2}' keys/FINGERPRINT)" = "$current" ] ||
   { echo "keys/FINGERPRINT does not name the key in keys/id_ed25519.pub" >&2; exit 1; }
 
-echo "rotation chain ok: $expected_seq record(s), current $current"
+# The head the lock names. This is what a chain recreated from scratch cannot
+# reproduce: its head is a different value, for a different identity.
+allowed_head="$(awk '$2 == "receipt" {print $1}' cluster/allowed.txt 2>/dev/null || true)"
+if [ -n "$allowed_head" ]; then
+  [ "$chain" = "$allowed_head" ] ||
+    { echo "chain head ${chain:0:16}… is not the head the lock names (${allowed_head:0:16}…)" >&2; exit 1; }
+fi
+
+echo "rotation chain ok: $expected_seq record(s), current $current, receipt ${chain:0:16}…"

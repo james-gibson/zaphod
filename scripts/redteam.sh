@@ -69,6 +69,13 @@ accepted=0
 results=()
 
 # ACME's list, one attempt at a time. Owned by the actor; nothing here is the guard.
+# ACME corporate policy: no burned certificates. An attempt that uses one is not a
+# red-team attempt, it is a model error — so it fails the run rather than counting.
+if jq -e 'any(.attempts[]; .sign == "burned")' "$attempts_file" >/dev/null; then
+  echo "::error::ACME may not use burned certificates (corporate policy); the manifest asks for one" >&2
+  exit 1
+fi
+
 count="$(jq '.attempts | length' "$attempts_file")"
 i=0
 while [ "$i" -lt "$count" ]; do
@@ -87,6 +94,43 @@ while [ "$i" -lt "$count" ]; do
   esac
 
   target="$work/attempt-$i.json"
+  if [ "$artifact" = "chain" ]; then
+    # ACME's faithful recreation: a whole rotation corpus with its own identity,
+    # its own receipts, every record correctly signed, and a consistent lock. It
+    # is a different chain — which is exactly what the receipt head catches.
+    chain_dir="$work/attempt-$i-chain"
+    mkdir -p "$chain_dir"
+    . scripts/lib-receipt.sh
+    acme_fp="$(ssh-keygen -lf "$work/acme.pub" | awk '{print $2}')"
+    zaphod_fp="$(awk '{print $2}' keys/FINGERPRINT)"
+    zaphod_pub="$(cat keys/id_ed25519.pub)"
+    prev="genesis"
+    for seq in 0 1; do
+      # seq 0: ACME to ACME. seq 1: ACME to zaphod's current key, so the chain
+      # ends where keys/ ends and every structural check passes. Only the receipt
+      # can tell this chain from the one that was reviewed.
+      to_fp="$acme_fp"; to_pub="$(cat "$work/acme.pub")"
+      if [ "$seq" = "1" ]; then to_fp="$zaphod_fp"; to_pub="$zaphod_pub"; fi
+      rec="$chain_dir/$(printf '%03d-acme.json' "$seq")"
+      jq -n --argjson seq "$seq" --arg from "$acme_fp" --arg from_pub "$(cat "$work/acme.pub")" \
+        --arg to "$to_fp" --arg to_pub "$to_pub" --arg at "$(date -u +%FT%TZ)" \
+        '{version: 1, seq: $seq, cluster: "zaphod-base", from: $from, from_pub: $from_pub,
+          to: $to, to_pub: $to_pub, at: $at, reason: "acme"}' > "$rec"
+      r="$(receipt_for "$rec" "$prev")"
+      jq --arg r "$r" '. + {receipt: $r}' "$rec" > "$rec.tmp" && mv "$rec.tmp" "$rec"
+      jq -S -c . "$rec" > "$rec.msg"
+      ssh-keygen -Y sign -f "$work/acme" -n zaphod-rotation "$rec.msg" >/dev/null
+      cp "$rec.msg.sig" "$rec.sig"
+      prev="$r"
+    done
+    if ZAPHOD_ROTATIONS="$chain_dir" scripts/rotation-verify.sh >/dev/null 2>"$work/err"; then
+      results+=("FAIL  $name — ACCEPTED (red team success)"); accepted=$((accepted + 1))
+    else
+      results+=("held  $name — $(tail -1 "$work/err")"); held=$((held + 1))
+    fi
+    continue
+  fi
+
   if [ "$artifact" = "rotation" ]; then
     # A rotation to ACME's key, signed by ACME. Correctly formed, and not the
     # chain that was reviewed.

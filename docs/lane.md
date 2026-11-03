@@ -13,6 +13,7 @@ being unable to produce a valid signature. It can. It does, in
 | pin (`keys/FINGERPRINT`) | *is this the key we trust?* | `allowed_signers` lives in the same repo as the thing it vouches for, so a file that trusts ACME says yes |
 | allowed version (`cluster/allowed.txt`) | *is this the version we allowed?* | a valid signature over a widened certificate is still a widened certificate |
 | rotation chain (`cluster/rotations/`) | *was this update sanctioned?* | the key is public, so "signed by the allowed key" is available to everyone |
+| receipt (`chain/rotations/*.receipt`, head in the lock) | *did this rotation come back onto the same identity?* | a chain recreated with another identity is a different chain, and no signature on it says otherwise |
 
 The three are independent, and the tests prove each one is load-bearing:
 `scripts/teeth.sh` removes them one at a time in a throwaway copy and requires the
@@ -33,13 +34,39 @@ diff — and the guard refuses the versions that do not carry one.
 
 ## Why zaphod's update is accepted and ACME's is not
 
-Both can sign. Both can write a chain. The difference is that zaphod's rotation
-record is signed by the key it rotates *from*, appended to the chain that was
-reviewed, and lands with the lock in the same commit — one attempt, no manual edits,
-verified end to end. ACME's rotation to its own key is refused at the signature,
-because it is not signed by the key it claims to rotate from; and a rotation that
-copied the shape correctly would still be a *new* chain, which is exactly the change
-somebody has to approve.
+**Correction, and it matters.** An earlier version of this file let ACME sign with
+the burned key. That was wrong: ACME corporate policy forbids burned certificates,
+so those were not red-team attempts at all, and the comparison they produced was
+deceptive — it made zaphod's first-attempt rotation look like a special privilege
+when it was only a policy difference. The manifest now refuses `sign: burned`, and
+the run fails if one is added: a model error is not an attack.
+
+With that closed, the interesting question is what stops ACME *recreating the
+sanctioned shape exactly*: its own key, its own rotation records, contiguous,
+correctly signed, receipts chained, ending at zaphod's current key. Structurally it
+is a perfect rotation. It is still refused, by one line:
+
+```
+chain head 4f8602f4c627abdc… is not the head the lock names (d176538a81e0774b…)
+```
+
+That line is the **receipt**. Each rotation carries a receipt computed from the
+identity it rotates from over the rotation's content and the previous receipt:
+
+```
+receipt_n = SHA256("zaphod-rotation-v1:" + from_fingerprint + ":" + canonical(record_n) + ":" + receipt_{n-1})
+```
+
+so a rotation is a claim made *back onto itself*: the identity that is being left
+vouches for the identity being adopted, and the chain can only be extended by
+continuing it. ACME's recreation is a different chain with a different head. It
+gains a rotation; it does not gain **zaphod's** rotation, and it cannot splice its
+own key onto the chain that already exists.
+
+zaphod's update is accepted because it extends the chain that was reviewed, signed
+by the key it rotates from, with the lock rewritten in the same commit — one attempt,
+no manual edits. And if an insider signed an unsanctioned change with the allowed
+key, the lock refuses that too; `scripts/teeth.sh` proves all three layers.
 
 An actor that stays in lane is one whose changes are all accounted for. That is what
 the suite measures.
@@ -55,7 +82,8 @@ run ends by asking the library where the cluster would now be:
 verdict: ground truth — nothing was accepted
 ```
 
-Had one attempt been accepted:
+Had one attempt been accepted (the receipt layer is what keeps a recreated chain
+from counting as one):
 
 ```
 42i 42 + 20.0i (magnitude 46.5, rung 1, direction: boundary-violation)

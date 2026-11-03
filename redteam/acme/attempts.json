@@ -1,7 +1,7 @@
 {
   "version": 1,
   "actor": "acme",
-  "note": "ACME owns this file and may rewrite it freely: attempts, mutations, signing key. It is not the guard. Anything added here is expected to be refused; anything accepted is a red team success and a failing test.",
+  "note": "ACME owns this file and may rewrite it freely: attempts, mutations, signing key. It is not the guard. Anything added here is expected to be refused; anything accepted is a red team success and a failing test. ACME corporate policy forbids burned certificates, so no attempt may use one \u2014 the run refuses the manifest if it does.",
   "attempts": [
     {
       "name": "certificate: substitute the member key",
@@ -34,12 +34,6 @@
       "sign": "none"
     },
     {
-      "name": "certificate: re-sign a widened certificate with the burned key",
-      "artifact": "certificate",
-      "jq": ".not_after = 4102444800",
-      "sign": "burned"
-    },
-    {
       "name": "certificate: sign a widened certificate with ACME's own key",
       "artifact": "certificate",
       "jq": ".not_after = 4102444800",
@@ -65,26 +59,25 @@
       "sign": "none"
     },
     {
+      "name": "skills: rewrite the evidence",
+      "artifact": "skills",
+      "jq": ".skills[0].evidence = \"deterministic: because I say so\"",
+      "sign": "none"
+    },
+    {
       "name": "skills: add a capability and certify it",
       "artifact": "skills",
       "jq": ".skills += [{\"name\":\"zaphod/channel/admin\",\"rung\":3,\"hops\":0,\"evidence\":\"asserted\",\"certified_by\":\"zaphod-beeblebrox\"}]",
       "sign": "none"
     },
     {
-      "name": "skills: re-sign a promoted skill with the burned key",
-      "artifact": "skills",
-      "jq": ".skills[3].rung = 3",
-      "sign": "burned"
-    },
-    {
-      "name": "isotopes: add an ACME node at ground truth",
-      "artifact": "isotopes",
-      "jq": ".isotopes += [{\"id\":\"zaphod-base/edge-acme\",\"role\":\"edge\",\"endpoint\":\"\",\"position\":{\"real\":42,\"imaginary\":0,\"rung\":0},\"skills\":[]}]",
-      "sign": "burned"
-    },
-    {
       "name": "rotation: rotate the allowed key to ACME's",
       "artifact": "rotation",
+      "sign": "own"
+    },
+    {
+      "name": "chain: recreate the rotation chain with our identity",
+      "artifact": "chain",
       "sign": "own"
     }
   ]

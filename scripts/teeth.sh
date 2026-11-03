@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
-# Prove the suite can fail.
+# Prove the suite can fail — one layer at a time.
 #
 #   scripts/teeth.sh
 #
 # A red-team suite that passes because nothing verifies is worse than no suite, so
-# this removes each layer of the guard in a throwaway copy and requires the suite
-# to go red — naming the attack, and showing the drift on the 42i axis.
+# each layer of the guard is removed in a throwaway copy and the run has to go red:
 #
-#   layer 1  the pin (keys/FINGERPRINT)  -> ACME's own key must be accepted
-#   layer 2  the allowed version (cluster/allowed.txt) -> a *correctly signed*
-#            change must be accepted, and the cluster must drift off 42+0i
+#   pin      keys/FINGERPRINT              ACME's own key must be accepted
+#   lock     cluster/allowed.txt           an unsanctioned re-sign must be accepted
+#   receipt  the chain head in the lock    a recreated chain must be accepted
+#
+# The lock case is deliberately *not* an ACME attempt: corporate policy forbids
+# ACME burned certificates, and the attack that only the lock catches — a changed
+# version signed with the allowed key — is the one an allowed or compromised
+# insider could make. It is tested here, on zaphod's side of the lane.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,29 +22,55 @@ trap 'rm -rf "$work"' EXIT
 
 fail() { echo "::error::$*" >&2; exit 1; }
 
-# expect_red <copy> <label> <needle>
-expect_red() {
-  local repo="$1" label="$2" needle="$3"
-  if ( cd "$repo" && scripts/redteam.sh > "$work/out" 2>&1 ); then
-    cat "$work/out" >&2
-    fail "$label: redteam.sh passed with the guard removed; the suite proves nothing"
-  fi
-  grep -q "$needle" "$work/out" ||
-    { cat "$work/out" >&2; fail "$label: the suite went red without saying why ($needle)"; }
-  echo "teeth: $label — the suite went red, as it must"
-}
-
 # ── layer 1: remove the fingerprint comparison ────────────────────────────────
 cp -R . "$work/pin"
 (cd "$work/pin" && perl -0pi -e 's/\[ "\$signer" = "\$pin" \] \|\| fail .*/true/' scripts/verify-artifact.sh)
 grep -q '^true$' "$work/pin/scripts/verify-artifact.sh" || fail "pin removal did not apply"
-expect_red "$work/pin" "pin removed" "RED TEAM SUCCEEDED"
+if ( cd "$work/pin" && scripts/redteam.sh > "$work/out" 2>&1 ); then
+  cat "$work/out" >&2
+  fail "pin removed: redteam.sh passed; the suite proves nothing"
+fi
+grep -q "RED TEAM SUCCEEDED" "$work/out" ||
+  { cat "$work/out" >&2; fail "pin removed: the suite went red without naming a success"; }
+echo "teeth: pin removed — the suite went red, as it must"
 
 # ── layer 2: remove the allowed-version comparison ────────────────────────────
 cp -R . "$work/lock"
-(cd "$work/lock" && perl -0pi -e 's/fail "drift from the only allowed version[^"]*"/true/' scripts/verify-artifact.sh)
-grep -q 'drift from the only allowed version' "$work/lock/scripts/verify-artifact.sh" &&
-  fail "allowed-version removal did not apply"
-expect_red "$work/lock" "allowed version removed" "verdict: drifted"
+(
+  cd "$work/lock"
+  # An unsanctioned update, signed with the allowed key: a change only the lock
+  # can refuse.
+  jq '.skills[3].rung = 3' cluster/skills.json > t && mv t cluster/skills.json
+  scripts/sign-artifact.sh cluster/skills.json zaphod-skills >/dev/null
 
-echo "both layers are load-bearing: removing either one lets a change through, and the 42i reading shows the drift"
+  if scripts/verify-artifact.sh cluster/skills.json zaphod-skills > "$work/lock-er" 2>&1; then
+    fail "lock present: an unsanctioned change was accepted"
+  fi
+  grep -q "drift from the only allowed version" "$work/lock-er" ||
+    { cat "$work/lock-er" >&2; fail "lock present: refusal did not name the drift"; }
+
+  perl -0pi -e 's/fail "drift from the only allowed version[^"]*"/true/' scripts/verify-artifact.sh
+  scripts/verify-artifact.sh cluster/skills.json zaphod-skills > /dev/null ||
+    fail "lock removed: the change was still refused; the case does not test the lock"
+
+  if command -v go >/dev/null 2>&1; then
+    go run ./cmd/isotope42 drift --accepted 1 | grep -q "verdict: drifted" ||
+      fail "the 42i reading did not show the drift"
+  fi
+)
+echo "teeth: lock removed — an unsanctioned re-sign got through, and the axis drifted"
+
+# ── layer 3: remove the receipt-head comparison ───────────────────────────────
+cp -R . "$work/receipt"
+(cd "$work/receipt" && perl -0pi -e 's/\[ "\$chain" = "\$allowed_head" \] \|\|/true ||/' scripts/rotation-verify.sh)
+grep -q '^  true ||' "$work/receipt/scripts/rotation-verify.sh" ||
+  fail "receipt removal did not apply"
+if ( cd "$work/receipt" && scripts/redteam.sh > "$work/out-receipt" 2>&1 ); then
+  cat "$work/out-receipt" >&2
+  fail "receipt removed: redteam.sh passed; the recreated chain proves nothing"
+fi
+grep -q "chain: recreate the rotation chain" "$work/out-receipt" ||
+  { cat "$work/out-receipt" >&2; fail "receipt removed: the accepted attempt was not the recreated chain"; }
+echo "teeth: receipt head removed — a recreated chain was accepted, and only then"
+
+echo "all three layers are load-bearing: removing any one lets a change through"

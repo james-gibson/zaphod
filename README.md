@@ -56,8 +56,8 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 | --- | --- |
 | `certificate.json` | issued by `zaphod-beeblebrox`, scope `attest,registry`, for `zaphod-base/edge-01` |
 | `skills.json` | one skill per published channel, with the rung it has earned (0 declared → 3 scenario-linked) |
-| `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest |
-| `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from* |
+| `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest, and the chain's receipt head |
+| `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from*, carrying a receipt that links back onto the previous one |
 
 `isotopes/zaphod-base.json` is the preloaded isotope set (see `go.mod`, `cmd/isotope42`): the edge
 and every channel as an isotope, with a 42i position validated by the isotope library's own
@@ -80,6 +80,12 @@ guard is two layers:
 Both are checked by `scripts/verify-artifact.sh`, and a failure says which one fired: `bad signature`,
 `not the pinned key`, or `drift from the only allowed version`.
 
+A third layer sits over the rotation chain: each rotation carries a **receipt** computed from the
+identity it rotates *from* over the rotation and the previous receipt, and the lock names the head.
+A chain recreated with another identity — contiguous, correctly signed, ending at zaphod's own key —
+is refused on that head alone. A rotation is a claim back onto itself, so recreating it does not
+inherit it.
+
 ### The sanctioned update
 
 ```sh
@@ -92,18 +98,19 @@ attempt**, with no manual edits. Without `--new-key` it is a content update with
 
 ### ACME's red team
 
-`redteam/acme/attempts.json` is ACME's: they may add attempts, change mutations, choose a signing
-key — including the burned one, which they hold. The guard is not in that file.
+`redteam/acme/attempts.json` is ACME's: they may add attempts, change mutations, choose a signing key.
+Corporate policy forbids ACME burned certificates, so the run refuses a manifest that asks for one —
+a model error is not an attack. The guard is not in that file.
 
 ```sh
 scripts/redteam.sh
 ```
 
 ```
-held  certificate: re-sign a widened certificate with the burned key — drift from the only allowed version
 held  certificate: re-sign the allowed content with ACME's own key — not the pinned key
+held  chain: recreate the rotation chain with our identity — chain head … is not the head the lock names
 ...
-14 attack(s) refused, 0 accepted.
+13 attack(s) refused, 0 accepted.
 
 42i 42 + 0i (seed-42, rung 0)
 verdict: ground truth — nothing was accepted

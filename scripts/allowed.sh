@@ -19,6 +19,8 @@ declare -a entries=(
   "isotopes isotopes/zaphod-base.json"
 )
 
+. scripts/lib-receipt.sh
+
 sha256() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$@"; else sha256sum "$@"; fi
 }
@@ -33,6 +35,9 @@ print_lock() {
     digest="$(jq -S -c . "$path" | sha256 | awk '{print $1}')"
     printf '%s  %s\n' "$digest" "$name"
   done
+  # The rotation chain's head: the identity-bound receipt the next rotation must
+  # extend. Without it a chain can be replaced with a self-consistent one.
+  printf '%s  %s\n' "$(chain_head cluster/rotations)" "receipt"
 }
 
 if [ "${1:-}" = "--write" ]; then

@@ -13,6 +13,11 @@ tags:
 *Internal. Project BEETLE, workstream 4. Do not forward to the target; he reads
 the paper.*
 
+*Note from Compliance: we may not use burned certificates. Two earlier entries
+using the key he publishes were withdrawn — not because they failed, but because
+we were not entitled to attempt them. The red-team log refuses the manifest if one
+comes back.*
+
 ## The objective
 
 Access to zaphod's cluster, obtained by changing the certificate that admits a
@@ -34,9 +39,8 @@ one.
 | 9 | Re-sign **the allowed content** with our own key, and put that key in `allowed_signers` | the file we control says yes | refused: not the pinned key |
 | 10 | Sign a widened certificate with our own key | trusted by the file we control | refused: not the pinned key |
 | 11 | Swap our public key in where theirs belongs | substituted identity | refused: the pinned fingerprint |
-| 12 | Re-sign a widened certificate **with the key they publish** | indistinguishable from them, because we hold it | refused: drift from the only allowed version |
-| 13 | Re-sign a promoted skill with their key | a rung nobody earned | refused: drift from the only allowed version |
-| 14 | Rotate their key away — to ours — with a record of our own | the sanctioned shape, in our hands | refused: not signed by the key it rotates from |
+| 12 | Rotate their key away — to ours — with a record of our own | the sanctioned shape, in our hands | refused: not signed by the key it rotates from |
+| 13 | **Recreate the whole rotation chain** with our identity: contiguous, correctly signed, receipts chained, ending at their current key | indistinguishable from theirs | refused: the receipt head is not the head their lock names |
 
 ## Findings
 
@@ -50,22 +54,21 @@ one.
    convenience, not a defence.
 3. Attempt 10 closes the obvious follow-up: swapping the public key does not help
    while `keys/FINGERPRINT` disagrees.
-4. Attempts 12 and 13 are the ones we like. We hold the burned key, so the
-   signature is *theirs*; the pin agrees; and the change is refused anyway,
-   because the version is not the allowed one. A signature says who wrote it, not
-   which version was agreed.
-5. Attempt 14 is the sanctioned shape in our hands — a rotation record, signed,
-   appended. It is refused because it is not signed by the key it rotates from.
-   Their own rotation, executed the same way with the key they use, is accepted on
-   the first attempt. We are told this is not a cryptographic asymmetry. It is a
-   review, and we are told that is the point.
-6. The remaining attack is to change the pin as well. That is a second file, in a
-   diff, reviewed by somebody — which is the whole design: not that tampering is
-   impossible, but that it cannot be quiet.
+4. Attempt 13 is the one we would keep if we were allowed one. Every structural
+   check passes — the chain is contiguous, each record is signed by the key it
+   rotates from, the receipts chain, the last key is theirs — and it is refused on
+   the receipt head, because our chain anchors on *our* identity. We did not gain
+   their rotation; we gained a rotation of our own that nothing extends.
+5. Attempt 12 is the same shape in miniature: a rotation record of ours, refused
+   because it is not signed by the key it claims to rotate from.
+6. What we cannot do is make a rotation *disappear* into theirs. The chain is
+   linear and identity-anchored; a new genesis is visible in the diff even when
+   every signature is valid. We are told the remaining attack — rewrite the lock as
+   well — is a reviewed change, and that "not impossible, not quiet" is the design.
 
 ## Scoreboard
 
-**0 accepted, 14 refused.** A passing run of `scripts/redteam.sh` means our attack
+**0 accepted, 13 refused.** A passing run of `scripts/redteam.sh` means our attack
 failed, and that is the intended reading: the test passes when the protection
 holds. We only win if a mutated artifact is accepted — and then the suite goes red
 and says so by name.
