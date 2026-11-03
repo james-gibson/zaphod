@@ -28,6 +28,57 @@ it is that every link names the one before it. The fixture tests exactly that: a
 recreated chain that is contiguous, correctly signed and ends at the right key is
 still refused because its receipt head is not the head the lock names.
 
+## A dynamic skill is a pre-negotiated rotation
+
+Every entry in `cluster/skills.json` now declares its contract **before** it can be
+certified, and the contract is one of two kinds:
+
+```json
+{"kind": "transforms", "inputs": ["vehicle"], "outputs": ["space"]}
+{"kind": "never", "never": "edit or delete an existing entry — the log is append-only"}
+```
+
+The first is a capability: *operate on these inputs to produce these outputs*. The
+second is a refusal that has been agreed in advance: *this skill will NEVER do this*.
+Both are negotiations, and they are different promises — the positive one bounds what
+the skill may be asked to do, the negative one bounds what it may never be asked to do
+even if it could.
+
+A skill with **no** declared contract is refused, and so is one that tries to be both
+an operation and a prohibition. That is the point of calling it pre-negotiated: the
+rotation is agreed at declaration time and the execution later is only the carrying
+out. An undeclared skill has not been negotiated with anybody, so there is nothing to
+certify — `scripts/cluster-verify.sh` checks this, and a certificate over a skill
+inventory with a contract missing is refused as drift.
+
+## Why self-promotion, and not a vote
+
+A rung is computed from evidence by a pure function of distance
+(`isotope.RungForDistance`). It is deliberately **not** a ballot, because a cluster
+that voted on rungs would race:
+
+- two observers seeing the same evidence in different orders can disagree, and both be
+  right about what they saw;
+- a membership change during a vote leaves a window where a rung is neither old nor
+  new, and a caller may read either;
+- and reconciliation after the race needs a tiebreak, which is exactly the authority
+  the vote was supposed to avoid needing.
+
+A function cannot disagree with itself. Every observer with the same evidence computes
+the same number, with no ordering, no quorum, and no window — which is why
+self-promotion is allowed rather than blocked. `cmd/isotope42 check` recomputes each
+declared rung from its distance and prints the property it is relying on:
+
+```
+positions ok: 5 isotope(s) in zaphod-base — rung is a function of distance, not a vote
+```
+
+The corollary is the one the rest of this repository is about: **a computed rung is a
+claim, not an authority.** The race is solved by making the number deterministic, not
+by making it trustworthy — trust lives in the chain (receipt, trail, the head the
+cluster holds), which is why ACME can compute any rung it likes for itself and still
+cannot inherit zaphod's.
+
 ## Why are nodes allowed to self-promote?
 
 Because a rung is a **claim**, not a grant — and the design's answer is that nothing

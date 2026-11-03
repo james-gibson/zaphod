@@ -44,6 +44,22 @@ if ! jq -e 'all(.skills[]; (.rung | type == "number") and .rung >= 0 and .rung <
   exit 1
 fi
 
+# A dynamic skill is a pre-negotiated rotation: it declares, before it runs, whether
+# it transforms inputs or promises never to do something. A skill with no declared
+# contract has not been negotiated, so it cannot be certified — and one that tries to
+# be both an operation and a prohibition is refused for the same reason.
+if ! jq -e 'all(.skills[];
+      (.contract | type == "object") and
+      ((.contract.kind == "transforms" and (.contract.inputs | length) > 0 and (.contract.outputs | length) > 0)
+       or (.contract.kind == "never" and (.contract.never | type == "string") and (.contract.never | length) > 0)))' \
+     "$skills" >/dev/null; then
+  echo "a skill has no negotiated contract (transforms with inputs and outputs, or never with a promise)" >&2
+  exit 1
+fi
+jq -r '.skills[] | if .contract.kind == "transforms"
+  then "  contract  \(.name): transforms \(.contract.inputs | join(",")) -> \(.contract.outputs | join(","))"
+  else "  contract  \(.name): never \(.contract.never)" end' "$skills"
+
 printf 'claims ok: %s, scope %s, expires %s\n' \
   "$cluster" "$(jq -r '.scope|join(",")' "$cert")" \
   "$(date -u -d "@$not_after" +%FT%TZ 2>/dev/null || date -u -r "$not_after" +%FT%TZ 2>/dev/null || echo "$not_after")"

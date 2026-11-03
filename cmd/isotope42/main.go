@@ -118,7 +118,12 @@ func check(path string) int {
 		fmt.Fprintf(os.Stderr, "isotope42: %d position(s) inconsistent\n", bad)
 		return 1
 	}
-	fmt.Printf("positions ok: %d isotope(s) in %s\n", len(set.Isotopes), set.Cluster)
+	// The rung is a function of the distance, recomputed here from the evidence. That
+	// is the point of the design: a cluster that voted on rungs would race, and two
+	// observers would disagree while both were right about what they saw. A pure
+	// function cannot disagree with itself.
+	fmt.Printf("positions ok: %d isotope(s) in %s — rung is a function of distance, not a vote\n",
+		len(set.Isotopes), set.Cluster)
 	return 0
 }
 

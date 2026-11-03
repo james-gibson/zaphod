@@ -59,6 +59,28 @@ it is the honest state of a cluster that has skills and no auditor, and
 `scripts/cluster-verify.sh` prints the note rather than quietly implying the next
 rung.
 
+## Each skill is a pre-negotiated rotation
+
+Before a skill can be certified it declares what it is, and there are only two kinds of
+declaration: it **transforms** named inputs into named outputs, or it will **never** do
+a named thing. The first bounds what it may be asked to do; the second bounds what it
+may not do even when it could. An undeclared skill is not a skill yet — it is a name
+somebody likes.
+
+- `car-park` — transforms a vehicle into space;
+- `gaffe-log` — never edits or deletes an entry;
+- `acme-correspondence` — never opens the letters;
+- `cabinet` — never confirms the ministry exists.
+
+## A rung is computed, not voted
+
+The rung comes from a pure function of distance. A cluster that voted would race: two
+observers could disagree about the same evidence, a membership change would leave a
+window in which a caller reads neither the old rung nor the new, and reconciliation
+would need the very authority the vote was meant to avoid. A function cannot disagree
+with itself, which is why the arithmetic is the mechanism rather than a shortcut — and
+why a computed rung is a claim, not an authority.
+
 ## The inventory is signed
 
 `cluster/skills.json` carries a detached signature from the burned key
