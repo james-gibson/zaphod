@@ -132,8 +132,17 @@ A stolen secret therefore buys **correct arithmetic on the wrong trail**. The fo
 entries verify — same secret, same formula — and the gate still refuses:
 
 ```
-held  trail: correct arithmetic with a stolen secret — not the trail I am on
+held  trail: correct arithmetic with a stolen secret — the trail was not walked by this cluster
 ```
+
+That last refinement was found by CI rather than by design. The first version of this
+case passed locally and failed in the pipeline, because two runs inside the same
+second produced a **byte-identical** entry: same sequence, same publication, same
+previous hash, same timestamp, same secret, so the same MAC and the same trail hash.
+The "forgery" *was* the real trail. Reproducing a trail is not forging one, and a gate
+that cannot tell them apart is not checking anything — the fix is the nonce the cluster
+consumes and keeps in its state, so the entry cannot be recomputed from a public
+transcript even by an actor holding the secret.
 
 That is the difference between authentication and authorisation stated in the only
 way a machine can state it: not "who are you", but "did you get here the way we get

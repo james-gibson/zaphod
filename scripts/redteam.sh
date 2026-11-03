@@ -341,9 +341,11 @@ cp -R . "$stolen_repo"
   # The attacker has the secret and writes its own trail, correctly attested,
   # ending on the same publication. Only the path is different.
   publication="$(jq -S -c '.artifacts' "$ZAPHOD_STATE_FILE" | sha256_hex)"
+  # The attacker picks its own nonce. It is the one thing the transcript does not
+  # contain, and it is why this case no longer depends on which second it runs in.
   entry="$(jq -n --argjson seq 0 --arg action init --arg publication "$publication" \
-    --arg prev genesis --arg at "$(date -u +%FT%TZ)" \
-    '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at}')"
+    --arg prev genesis --arg at "2000-01-01T00:00:00Z" --arg nonce "acme" \
+    '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at, nonce: $nonce}')"
   mac="$(printf '%s' "$(cat "$secret_stolen"):$(jq -S -c . <<<"$entry"):trail" | sha256_hex)"
   hash="$(printf '%s' "$(jq -S -c --arg m "$mac" '. + {attestation: $m}' <<<"$entry")" | sha256_hex)"
   jq -c --arg m "$mac" --arg h "$hash" '. + {attestation: $m, hash: $h}' <<<"$entry" > "$stolen_dir/acme-trail.jsonl"
@@ -353,12 +355,12 @@ cp -R . "$stolen_repo"
     echo "FAIL  trail: attested with a stolen secret — ACCEPTED (red team success)"
     exit 1
   fi
-  grep -q "not the trail I am on" "$work/stolen-out" || {
+  grep -q "not walked by this cluster" "$work/stolen-out" || {
     echo "FAIL  trail: refused for the wrong reason: $(tail -1 "$work/stolen-out")"
     exit 1
   }
 ) && {
-  results+=("held  trail: correct arithmetic with a stolen secret — $(grep -o 'not the trail I am on' "$work/stolen-out" | head -1)")
+  results+=("held  trail: correct arithmetic with a stolen secret — $(grep -o 'the trail was not walked by this cluster.*' "$work/stolen-out" | head -1 | cut -c1-72)")
   held=$((held + 1))
 } || {
   results+=("FAIL  trail: a forged trail was accepted")

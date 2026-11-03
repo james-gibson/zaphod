@@ -152,9 +152,13 @@ action="publish"
 [ -n "$prev" ] || { prev="genesis"; action="init"; }
 # Hash with the trailing newline jq would print, so it matches the gate exactly.
 publication_hash="$(printf '%s\n' "$publication" | sha256_hex)"
+# A nonce the cluster consumes and keeps in its own state. Without it an actor holding
+# the secret can recompute the entry exactly — the transcript is public and a timestamp
+# to the second is not a secret — which is not a forgery any gate could see.
+nonce="$(head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' \n')"
 entry="$(jq -n --argjson seq "$seq" --arg action "$action" --arg publication "$publication_hash" \
-  --arg prev "$prev" --arg at "$(date -u +%FT%TZ)" \
-  '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at}')"
+  --arg prev "$prev" --arg at "$(date -u +%FT%TZ)" --arg nonce "$nonce" \
+  '{seq: $seq, action: $action, publication: $publication, prev: $prev, at: $at, nonce: $nonce}')"
 mac="$(printf '%s' "$(cat "$identity_file"):$(jq -S -c . <<<"$entry"):trail" | sha256_hex)"
 hash="$(printf '%s' "$(jq -S -c --arg m "$mac" '. + {attestation: $m}' <<<"$entry")" | sha256_hex)"
 jq -c --arg m "$mac" --arg h "$hash" '. + {attestation: $m, hash: $h}' <<<"$entry" >> "$trail"
@@ -166,8 +170,10 @@ canonical_state="$(jq -S -c -n \
   --argjson artifacts "$publication" \
   --arg head "$(chain_head cluster/rotations)" \
   --arg trail_head "$hash" \
+  --arg trail_nonce "$nonce" \
   --arg at "$(date -u +%FT%TZ)" \
-  '{artifacts: $artifacts, receipt_head: $head, trail_head: $trail_head, attested_at: $at}')"
+  '{artifacts: $artifacts, receipt_head: $head, trail_head: $trail_head,
+    trail_nonce: $trail_nonce, attested_at: $at}')"
 attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
 printf '%s' "$canonical_state" | jq --arg a "$attestation" '. + {attestation: $a}' > "$state_file"
 

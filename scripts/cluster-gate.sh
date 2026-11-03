@@ -74,6 +74,17 @@ while IFS= read -r line; do
   expected_seq=$((expected_seq + 1))
 done < "$trail_file"
 
+# The nonce: was this entry issued by this cluster, or recomputed from the transcript?
+# The publication is public and a timestamp to the second is not a secret, so without
+# this an actor holding the secret reproduces the trail exactly — and that is not a
+# forgery any gate could see. The nonce lives only in the cluster's state.
+state_nonce="$(jq -r '.trail_nonce // empty' "$state_file")"
+[ -n "$state_nonce" ] || fail "cluster state does not record a trail nonce"
+last_nonce="$(tail -1 "$trail_file" | jq -r '.nonce // empty')"
+[ "$last_nonce" = "$state_nonce" ] ||
+  fail "the trail was not walked by this cluster (nonce ${last_nonce:-absent} is not ${state_nonce:0:12}…)"
+
+
 state_head="$(jq -r '.receipt_head // empty' "$state_file")"
 trail_head="$(tail -1 "$trail_file" | jq -r .hash)"
 state_artifacts="$(jq -S -c '.artifacts' "$state_file" | sha256_hex)"
