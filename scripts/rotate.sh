@@ -128,10 +128,29 @@ if [ -f isotopes/zaphod-base.json ]; then
 fi
 scripts/allowed.sh --write >/dev/null
 
+# The cluster's own record of what it just accepted, attested with its secret and
+# kept outside the repository. The publication can be rewritten; this cannot.
+identity_file="${ZAPHOD_IDENTITY_FILE:-$HOME/.zaphod/identity.secret}"
+state_file="${ZAPHOD_STATE_FILE:-$(dirname "$identity_file")/state.json}"
+mkdir -p "$(dirname "$state_file")"
+jq -n \
+  --arg certificate "$(jq -S -c . cluster/certificate.json | sha256_hex)" \
+  --arg skills "$(jq -S -c . cluster/skills.json | sha256_hex)" \
+  --arg isotopes "$(jq -S -c . isotopes/zaphod-base.json | sha256_hex)" \
+  --arg head "$(chain_head cluster/rotations)" \
+  --arg at "$(date -u +%FT%TZ)" \
+  '{artifacts: {certificate: $certificate, skills: $skills, isotopes: $isotopes},
+    receipt_head: $head, attested_at: $at}' > "$state_file"
+canonical_state="$(jq -S -c . "$state_file")"
+attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
+jq --arg a "$attestation" '. + {attestation: $a}' "$state_file" > "$state_file.tmp"
+mv "$state_file.tmp" "$state_file"
+
 # The point of the exercise: no manual edits, no second attempt.
 scripts/cluster-verify.sh >/dev/null
 scripts/rotation-verify.sh >/dev/null
 scripts/guard-keys.sh >/dev/null
+ZAPHOD_IDENTITY_FILE="$identity_file" ZAPHOD_STATE_FILE="$state_file" scripts/cluster-gate.sh >/dev/null
 
 echo "rotation accepted on the first attempt: $old_fp -> $new_fp"
 echo "  record: $record (signed by the key it rotates from)"

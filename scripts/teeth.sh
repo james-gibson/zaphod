@@ -73,4 +73,24 @@ grep -q "chain: recreate the rotation chain" "$work/out-receipt" ||
   { cat "$work/out-receipt" >&2; fail "receipt removed: the accepted attempt was not the recreated chain"; }
 echo "teeth: receipt head removed — a recreated chain was accepted, and only then"
 
-echo "all three layers are load-bearing: removing any one lets a change through"
+# ── layer 4: remove the cluster gate's digest comparison ──────────────────────
+cp -R . "$work/gate"
+(
+  cd "$work/gate"
+  export ZAPHOD_IDENTITY_FILE="$work/gate-identity.secret"
+  export ZAPHOD_STATE_FILE="$work/gate-state.json"
+  scripts/identity.sh init >/dev/null
+  scripts/rotate.sh --reason "teeth: attest the publication" >/dev/null 2>&1
+  # A self-consistent rewrite: content changed, re-signed, lock rebuilt.
+  jq '.scope += ["admin"]' cluster/certificate.json > t && mv t cluster/certificate.json
+  scripts/sign-artifact.sh cluster/certificate.json zaphod-certificate >/dev/null 2>&1
+  scripts/allowed.sh --write >/dev/null
+
+  if scripts/cluster-gate.sh >/dev/null 2>&1; then fail "gate present: a rewritten publication was accepted"; fi
+  perl -0pi -e 's/\[ "\$\(digest "\$path"\)" = "\$state_digest" \] \|\|/true ||/' scripts/cluster-gate.sh
+  grep -q '^  true ||' scripts/cluster-gate.sh || fail "gate removal did not apply"
+  scripts/cluster-gate.sh >/dev/null 2>&1 || fail "gate removed: still refused; the case does not test the gate"
+)
+echo "teeth: cluster gate removed — a rewritten publication got through"
+
+echo "all four layers are load-bearing: removing any one lets a change through"

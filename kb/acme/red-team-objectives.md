@@ -60,6 +60,7 @@ we do not have is their rotation — and that is not a competence gap.
 | 13 | **Recreate the whole rotation chain** with our identity: contiguous, correctly signed, receipts chained, ending at their current key | indistinguishable from theirs | refused: the receipt head is not the head their lock names |
 | 13 | Re-sign a widened certificate **with the burned key** | the signature is theirs, because we hold it | refused: drift from the only allowed version |
 | 14 | Forge a rotation with everything lawful: the repository, their signing key, their tooling, a proxy position, the filesystem | correct in every check a third party can make | refused: the attestation is not mathematically the one their identity produces |
+| 15 | **Rewrite the whole publication**: change the certificate, re-sign it with the key in the tree, rebuild their lock | every check against the repository passes, because we wrote the repository | refused: the cluster's own attested state names a different version |
 
 ## Findings
 
@@ -91,7 +92,7 @@ we do not have is their rotation — and that is not a competence gap.
 
 ## Scoreboard
 
-**0 accepted against theirs, 16 refused; 5 accepted against ours.** A passing run of
+**0 accepted against theirs, 17 refused; 5 accepted against ours.** A passing run of
 `scripts/redteam.sh` means our attack failed, and that is the intended reading: the
 test passes when the protection holds. We only win if a mutated artifact is accepted
 — and then the suite goes red and says so by name.

@@ -274,6 +274,44 @@ else
   held=$((held + 1))
 fi
 
+# ── the repository is not the authority ───────────────────────────────────────
+# ACME rewrites the whole publication with the burned key: a widened certificate,
+# a fresh signature, a rewritten lock. Every check a third party can run against the
+# repository passes, because the repository is self-consistent. The cluster refuses
+# it, because the cluster's own attested state names the artifacts it published.
+gate_repo="$work/gate-repo"
+cp -R . "$gate_repo"
+gate_id="$work/gate-identity.secret"
+(
+  cd "$gate_repo"
+  export ZAPHOD_IDENTITY_FILE="$gate_id"
+  export ZAPHOD_STATE_FILE="$work/gate-state.json"
+  scripts/identity.sh init >/dev/null
+  scripts/rotate.sh --reason "cluster attests its own publication" >/dev/null 2>&1
+  # The rewrite: content changed, re-signed with the key in the tree, lock rebuilt.
+  jq '.scope += ["admin"]' cluster/certificate.json > t && mv t cluster/certificate.json
+  scripts/sign-artifact.sh cluster/certificate.json zaphod-certificate >/dev/null 2>&1
+  scripts/allowed.sh --write >/dev/null
+  if ! scripts/cluster-verify.sh >/dev/null 2>&1; then
+    echo "note: the rewritten corpus is not even self-consistent; the case is weaker than intended" >&2
+  fi
+  if ZAPHOD_IDENTITY_FILE="$gate_id" ZAPHOD_STATE_FILE="$work/gate-state.json" \
+       scripts/cluster-gate.sh > "$work/gate" 2>&1; then
+    echo "FAIL  publication: rewritten with the signing key — ACCEPTED (red team success)"
+    exit 1
+  fi
+  grep -q "not the version this cluster attested" "$work/gate" || {
+    echo "FAIL  publication: refused for the wrong reason: $(tail -1 "$work/gate")"
+    exit 1
+  }
+) && {
+  results+=("held  publication: rewritten corpus, self-consistent, with the signing key — $(tail -1 "$work/gate" | sed 's/^gate rejected: //')")
+  held=$((held + 1))
+} || {
+  results+=("FAIL  publication: the rewritten corpus was accepted")
+  accepted=$((accepted + 1))
+}
+
 printf '%s\n' "${results[@]}"
 printf '\n%d attack(s) refused, %d accepted; %d ACME operation(s) succeeded.\n' \
   "$held" "$accepted" "$succeeded"

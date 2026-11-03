@@ -60,6 +60,7 @@ jobs:
           test "$(jq '.seq' cluster/rotations/*.json | sort -n | tail -1)" = "1"
           test "$(jq -r .subject_fingerprint cluster/certificate.json)" = "$(awk '{print $2}' keys/FINGERPRINT)"
           scripts/guard-keys.sh
+          scripts/cluster-gate.sh
 
       # A suite that passes because nothing verifies is worse than no suite. Each
       # layer of the guard is removed in a throwaway copy and the suite must go

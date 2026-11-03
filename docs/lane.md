@@ -15,6 +15,7 @@ being unable to produce a valid signature. It can. It does, in
 | rotation chain (`cluster/rotations/`) | *was this update sanctioned?* | the key is public, so "signed by the allowed key" is available to everyone |
 | receipt (`chain/rotations/*.receipt`, head in the lock) | *did this rotation come back onto the same identity?* | a chain recreated with another identity is a different chain, and no signature on it says otherwise |
 | attestation (`attestation` field, checked by the cluster) | *did the running identity authorise it?* | the signing key is public, so a signature cannot answer this; the secret was never in the repository |
+| cluster gate (`cluster-gate.sh`, state beside the secret) | *is this what I published?* | every file in the repository can be rewritten, including the lock and the pin, by anyone with the repo |
 
 The three are independent, and the tests prove each one is load-bearing:
 `scripts/teeth.sh` removes them one at a time in a throwaway copy and requires the
@@ -77,10 +78,24 @@ and the CI job. That is not enforced by permissions — ACME can write files in 
 repo — it is enforced by **review**: a change to the guard is a diff somebody reads,
 while a change to the attempts is expected and unremarkable.
 
+**And the cluster cannot rely on corporate policy to save it.** An adversary is not
+bound by zaphod's rules, by review, or by who owns a file. The repository is a
+*publication*: anyone with it can rewrite the artifacts, the lock, the pin and the
+rotation chain, and produce something that is internally consistent — every check a
+third party can run against the repository passes, because the repository says so.
+That is why the last check does not read the repository's bookkeeping at all. The
+cluster keeps its own state beside its identity secret, outside the repository, and
+asks a different question:
+
+```
+held  publication: rewritten corpus, self-consistent, with the signing key — the published certificate is not the version this cluster attested
+```
+
 So the demonstration is not "tampering is impossible". It is "tampering cannot be
-quiet". ACME may do anything inside the space it owns; every change outside that
-space arrives as a record — a rotation with a signature, a lock rewrite, a reviewed
-diff — and the guard refuses the versions that do not carry one.
+quiet, and the position it cannot reach is the one the cluster holds." ACME may do
+anything inside the space it owns; every change outside that space arrives as a
+record — a rotation with a signature, a lock rewrite, a diff — and what is not
+recorded is refused by arithmetic rather than by process.
 
 ## Why zaphod's update is accepted and ACME's is not
 

@@ -57,6 +57,7 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 | `certificate.json` | issued by `zaphod-beeblebrox`, scope `attest,registry`, for `zaphod-base/edge-01` |
 | `skills.json` | one skill per published channel, with the rung it has earned (0 declared → 3 scenario-linked) |
 | `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest, and the chain's receipt head |
+| `state.json` | the cluster's own attested record of what it published — beside its secret, outside this repository |
 | `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from*, carrying a receipt that links back onto the previous one |
 
 `isotopes/zaphod-base.json` is the preloaded isotope set (see `go.mod`, `cmd/isotope42`): the edge
@@ -64,9 +65,15 @@ and every channel as an isotope, with a 42i position validated by the isotope li
 `RungForDistance` rather than asserted.
 
 ```sh
-scripts/cluster-verify.sh     # chain, signatures, pin, allowed version, isotopes
+scripts/cluster-verify.sh     # the publication: chain, signatures, pin, allowed version, isotopes
+scripts/cluster-gate.sh       # the cluster: is this what I attested? (needs the identity secret)
 scripts/isotopes-verify.sh    # the set alone, including rung/distance agreement
 ```
+
+The repository is a **publication**, not the authority. Anyone holding it can rewrite the artifacts,
+the lock and the pin, and produce something internally consistent. The cluster therefore keeps its own
+attested state beside its identity secret and refuses a publication it never attested — even a
+self-consistent one signed with the key in the tree.
 
 ### Two questions, two layers
 
@@ -126,11 +133,12 @@ chain, its own certificate and its own signature all succeed on the first attemp
 is zaphod's rotation. Capability is not continuity, and the suite records both lists because a guard
 that only says no is indistinguishable from a broken one.
 
-The last case is set up to lose on purpose: ACME is given the repository, the burned signing key, the
-tooling and the filesystem, and produces a rotation that is correct in every respect a third party can
-check. The cluster refuses it on arithmetic — the rotation's attestation is computed from an identity
-secret the repository never held — not on policy. See [`docs/lane.md`](docs/lane.md) for the boundary
-that leaves out (process memory) and why it is named rather than assumed.
+The last cases are set up to lose on purpose: ACME is given the repository, the burned signing key, the
+tooling, a proxy position and the filesystem. It produces a rotation that is correct in every respect a
+third party can check, and a publication that is internally consistent end to end. The cluster refuses
+both on arithmetic — the attestation and the attested state are computed from an identity secret the
+repository never held — not on policy, review or ownership. See [`docs/lane.md`](docs/lane.md) for the
+one boundary that is left out (process memory) and why it is named rather than assumed.
 
 Every attack must be refused. A passing run means the protection held; an accepted one is a red team
 success and a failing test, and the run reports where the cluster would be on the 42i axis (the
