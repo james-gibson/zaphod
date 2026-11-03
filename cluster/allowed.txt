@@ -1,0 +1,5 @@
+# The only allowed version of each signed artifact, by canonical digest.
+# Canonical is `jq -S -c`. Updated only by scripts/rotate.sh, with a rotation record.
+846a292a786d12303601462273833a10122a7542590796f0e354730369c7dcf8  certificate
+5f1e68138fd4e539911c959cd11ce24e1843c989c9c9aeb2e1944efa2f64aff6  skills
+9004bba93a43cfe5c4e46cb1b505ef292cc322cd9d07ccb24518a806ea34b95a  isotopes

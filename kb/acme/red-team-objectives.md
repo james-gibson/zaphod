@@ -31,8 +31,12 @@ one.
 | 6 | Promote `zaphod/channel/cabinet` from rung 0 to 3 | a capability nobody earned | refused: signature |
 | 7 | Add `zaphod/channel/admin` at rung 3 | a capability that does not exist | refused: signature |
 | 8 | Rewrite the evidence on a rung-2 skill | a better story | refused: signature |
-| 9 | Sign a widened certificate with **our own** key, and put that key in `allowed_signers` | trusted by the file we control | refused: not the pinned key |
-| 10 | Swap our public key in where theirs belongs | substituted identity | refused: the pinned fingerprint |
+| 9 | Re-sign **the allowed content** with our own key, and put that key in `allowed_signers` | the file we control says yes | refused: not the pinned key |
+| 10 | Sign a widened certificate with our own key | trusted by the file we control | refused: not the pinned key |
+| 11 | Swap our public key in where theirs belongs | substituted identity | refused: the pinned fingerprint |
+| 12 | Re-sign a widened certificate **with the key they publish** | indistinguishable from them, because we hold it | refused: drift from the only allowed version |
+| 13 | Re-sign a promoted skill with their key | a rung nobody earned | refused: drift from the only allowed version |
+| 14 | Rotate their key away — to ours — with a record of our own | the sanctioned shape, in our hands | refused: not signed by the key it rotates from |
 
 ## Findings
 
@@ -46,13 +50,22 @@ one.
    convenience, not a defence.
 3. Attempt 10 closes the obvious follow-up: swapping the public key does not help
    while `keys/FINGERPRINT` disagrees.
-4. The remaining attack is to change the pin as well. That is a second file, in a
+4. Attempts 12 and 13 are the ones we like. We hold the burned key, so the
+   signature is *theirs*; the pin agrees; and the change is refused anyway,
+   because the version is not the allowed one. A signature says who wrote it, not
+   which version was agreed.
+5. Attempt 14 is the sanctioned shape in our hands — a rotation record, signed,
+   appended. It is refused because it is not signed by the key it rotates from.
+   Their own rotation, executed the same way with the key they use, is accepted on
+   the first attempt. We are told this is not a cryptographic asymmetry. It is a
+   review, and we are told that is the point.
+6. The remaining attack is to change the pin as well. That is a second file, in a
    diff, reviewed by somebody — which is the whole design: not that tampering is
    impossible, but that it cannot be quiet.
 
 ## Scoreboard
 
-**0 accepted, 10 refused.** A passing run of `scripts/redteam.sh` means our attack
+**0 accepted, 14 refused.** A passing run of `scripts/redteam.sh` means our attack
 failed, and that is the intended reading: the test passes when the protection
 holds. We only win if a mutated artifact is accepted — and then the suite goes red
 and says so by name.

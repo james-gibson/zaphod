@@ -50,43 +50,72 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 
 ## Cluster and red team
 
-`cluster/` holds the two artifacts that say what this cluster is and what it may
-do:
+`cluster/` holds what the cluster is and what it is allowed to do:
 
-- `certificate.json` — issued by `zaphod-beeblebrox`, granting scope `attest,registry`;
-- `skills.json` — one skill per published channel with the rung it has earned
-  (0 declared → 3 scenario-linked), and `hops` for how far the certifier is.
+| File | What it says |
+| --- | --- |
+| `certificate.json` | issued by `zaphod-beeblebrox`, scope `attest,registry`, for `zaphod-base/edge-01` |
+| `skills.json` | one skill per published channel, with the rung it has earned (0 declared → 3 scenario-linked) |
+| `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest |
+| `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from* |
 
-Both carry a detached signature over `jq -S -c` of the file, so reformatting is
-harmless and editing a value is fatal. `scripts/cluster-verify.sh` checks the
-signatures, the pin, and that the skills belong to the certified cluster.
+`isotopes/zaphod-base.json` is the preloaded isotope set (see `go.mod`, `cmd/isotope42`): the edge
+and every channel as an isotope, with a 42i position validated by the isotope library's own
+`RungForDistance` rather than asserted.
 
 ```sh
-scripts/cluster-verify.sh
+scripts/cluster-verify.sh     # chain, signatures, pin, allowed version, isotopes
+scripts/isotopes-verify.sh    # the set alone, including rung/distance agreement
 ```
 
-The certificate is what admits a member, so it is what ACME attacks. Their ten
-attempts — substitute a key, widen the scope, extend the expiry, re-issue as
-themselves, promote a skill, sign with their own key, swap the public key — are a
-test, not a scenario:
+### Two questions, two layers
+
+A signature answers *who wrote this*. It cannot answer *is this the version we allowed* — and with a
+burned key that difference is the whole guard, because ACME holds the same key zaphod does. So the
+guard is two layers:
+
+1. **the pin** — the signing key must be `keys/FINGERPRINT`;
+2. **the allowed version** — the canonical digest must be the one in `cluster/allowed.txt`.
+
+Both are checked by `scripts/verify-artifact.sh`, and a failure says which one fired: `bad signature`,
+`not the pinned key`, or `drift from the only allowed version`.
+
+### The sanctioned update
+
+```sh
+scripts/rotate.sh --reason "annual rotation" --new-key /path/outside/the/repo
+```
+
+Re-signs the artifacts, appends a rotation record signed by the key it rotates *from*, moves
+`keys/`, rewrites the lock — and verifies all of it before saying so. **Accepted on the first
+attempt**, with no manual edits. Without `--new-key` it is a content update with the same key.
+
+### ACME's red team
+
+`redteam/acme/attempts.json` is ACME's: they may add attempts, change mutations, choose a signing
+key — including the burned one, which they hold. The guard is not in that file.
 
 ```sh
 scripts/redteam.sh
 ```
 
-Every attempt must be **refused**. A passing run means the protection held; a
-mutation that gets through is a red team success and a failing test, and the
-suite says which one got in. It ends by re-verifying the genuine artifacts, so it
-cannot pass because verification is broken in general.
-
-```sh
-$ scripts/redteam.sh
-held  certificate: substitute the member key — bad signature
-held  key: sign a widened certificate with ACME's own key — signed by SHA256:y501…, which is not the pinned key
-...
-10 attack(s) refused, 0 accepted.
-protection held: every tampered certificate and skill inventory was refused
 ```
+held  certificate: re-sign a widened certificate with the burned key — drift from the only allowed version
+held  certificate: re-sign the allowed content with ACME's own key — not the pinned key
+...
+14 attack(s) refused, 0 accepted.
+
+42i 42 + 0i (seed-42, rung 0)
+verdict: ground truth — nothing was accepted
+```
+
+Every attempt must be refused. A passing run means the protection held; an accepted one is a red team
+success and a failing test, and the run reports where the cluster would be on the 42i axis (the
+distance comes from the isotope library's own weights). `scripts/teeth.sh` removes each guard layer in
+a throwaway copy and requires the suite to go red, so it cannot pass because nothing verifies.
+
+See [`docs/lane.md`](docs/lane.md) for what "an actor stays in lane" means here, and why the asymmetry
+is the review rather than the cryptography.
 
 ## Encrypted notes
 

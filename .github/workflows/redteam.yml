@@ -2,7 +2,7 @@ name: Red team
 
 # The protection is only worth what its worst-tested case says it is worth, so the
 # mutation suite runs on every push, on a timer, and on demand. A passing run
-# means every tampered certificate and skill inventory was refused.
+# means ACME changed everything it owns and the guard refused all of it.
 
 on:
   push:
@@ -21,8 +21,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - name: Install jq and age
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq age
+
+      - name: Build (the 42i reader is the library's own arithmetic)
+        run: |
+          go build ./...
+          test -z "$(gofmt -l cmd)" || { echo "::error::gofmt needed"; gofmt -l cmd; exit 1; }
 
       - name: The genuine artifacts verify
         run: scripts/cluster-verify.sh
@@ -30,25 +40,28 @@ jobs:
       - name: Every tampered artifact is refused
         run: scripts/redteam.sh
 
-      # A suite that passes because nothing verifies is worse than no suite. Pin
-      # the failure mode: with the pin check removed the ACME-signed certificate
-      # must be accepted and the suite must go red, naming the attack.
-      - name: The suite fails when the protection is removed
+      # Zaphod's own update: one attempt, no manual edits, and the certificate
+      # follows the key. This is the permitted path the red team is measured
+      # against — an actor in lane.
+      - name: Zaphod rotates on the first attempt
         run: |
           set -euo pipefail
           work="$(mktemp -d)"
           cp -R . "$work/repo"
           cd "$work/repo"
-          # Drop the fingerprint comparison from the verifier.
-          perl -0pi -e 's/\[ "\$signer" = "\$pin" \] \|\| fail .*/true/' scripts/verify-artifact.sh
-          if scripts/redteam.sh > "$work/out" 2>&1; then
-            echo "::error::redteam.sh passed with the pin check removed; the suite proves nothing"
-            cat "$work/out"
-            exit 1
-          fi
-          grep -q "RED TEAM SUCCEEDED" "$work/out" || {
-            echo "::error::removing the pin did not produce a named red team success"
-            cat "$work/out"
-            exit 1
-          }
-          echo "the suite goes red, and names the attack, when the pin is removed"
+          ssh-keygen -q -t ed25519 -N '' -C "zaphod-beeblebrox DO NOT USE" -f "$work/newkey"
+          scripts/rotate.sh --reason "ci rotation" --new-key "$work/newkey" | tee "$work/out"
+          grep -q "rotation accepted on the first attempt" "$work/out"
+          scripts/cluster-verify.sh >/dev/null
+          scripts/rotation-verify.sh
+          test "$(jq '.seq' cluster/rotations/*.json | sort -n | tail -1)" = "1"
+          test "$(jq -r .subject_fingerprint cluster/certificate.json)" = "$(awk '{print $2}' keys/FINGERPRINT)"
+          scripts/guard-keys.sh
+
+      # A suite that passes because nothing verifies is worse than no suite. Each
+      # layer of the guard is removed in a throwaway copy and the suite must go
+      # red: with the pin gone ACME's own key is accepted; with the allowed
+      # version gone a correctly signed change is accepted and the 42i reading
+      # drifts.
+      - name: Each guard layer is load-bearing
+        run: scripts/teeth.sh

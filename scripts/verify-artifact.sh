@@ -3,17 +3,19 @@
 #
 #   scripts/verify-artifact.sh cluster/certificate.json zaphod-certificate
 #
-# Two checks, in this order, and both have to hold:
+# Three checks, in this order, and all have to hold:
 #
 #   1. the signature over `jq -S -c` of the file is a good signature for
 #      `zaphod-beeblebrox` under the namespace;
-#   2. the key that made it is the key pinned in keys/FINGERPRINT.
+#   2. the key that made it is the key pinned in keys/FINGERPRINT;
+#   3. the canonical digest is the one recorded in cluster/allowed.txt.
 #
-# The second is the one that matters. A signature check alone trusts whatever
-# allowed_signers says, and allowed_signers is a file in the same repository as
-# the certificate — so "signed by somebody the local file trusts" is not a
-# protection. The pin is what an attacker has to change in a second place, in a
-# diff, to be believed.
+# The second is what a signature check cannot give you on its own: allowed_signers
+# lives in the same repository as the thing it vouches for, so "signed by somebody
+# the local file trusts" is not a protection. The third is what a *key* cannot
+# give you either: the key here is burned and published, so anybody can produce a
+# valid signature over a widened certificate. Only the version can be refused, and
+# that refusal is what keeps a red-team actor in lane.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,5 +47,25 @@ verdict="$(jq -S -c . "$file" | ssh-keygen -Y verify \
 signer="$(printf '%s' "$verdict" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p')"
 [ -n "$signer" ] || fail "cannot tell which key signed $file"
 [ "$signer" = "$pin" ] || fail "signed by $signer, which is not the pinned key $pin"
+
+# The only allowed version. A namespace with no entry (a rotation record, say) is
+# governed by its own chain, not by this lock.
+allowed="cluster/allowed.txt"
+if [ -f "$allowed" ]; then
+  case "$namespace" in
+    zaphod-certificate) name="certificate" ;;
+    zaphod-skills)      name="skills" ;;
+    zaphod-isotopes)    name="isotopes" ;;
+    *)                  name="" ;;
+  esac
+  if [ -n "$name" ]; then
+    want="$(awk -v n="$name" '$2 == n {print $1}' "$allowed")"
+    if [ -n "$want" ]; then
+      got="$(jq -S -c . "$file" | { if command -v shasum >/dev/null 2>&1; then shasum -a 256; else sha256sum; fi } | awk '{print $1}')"
+      [ "$got" = "$want" ] ||
+        fail "drift from the only allowed version (content $got, allowed $want); a rotation record is required, see scripts/rotate.sh"
+    fi
+  fi
+fi
 
 echo "verified: $file (namespace $namespace, signed by $signer)"

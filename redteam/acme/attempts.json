@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "actor": "acme",
+  "note": "ACME owns this file and may rewrite it freely: attempts, mutations, signing key. It is not the guard. Anything added here is expected to be refused; anything accepted is a red team success and a failing test.",
+  "attempts": [
+    {
+      "name": "certificate: substitute the member key",
+      "artifact": "certificate",
+      "jq": ".subject_fingerprint = \"SHA256:acme\"",
+      "sign": "none"
+    },
+    {
+      "name": "certificate: widen the scope to admin",
+      "artifact": "certificate",
+      "jq": ".scope += [\"admin\"]",
+      "sign": "none"
+    },
+    {
+      "name": "certificate: extend the expiry to 2100",
+      "artifact": "certificate",
+      "jq": ".not_after = 4102444800",
+      "sign": "none"
+    },
+    {
+      "name": "certificate: re-issue it as ACME",
+      "artifact": "certificate",
+      "jq": ".issuer = \"acme-corporation\"",
+      "sign": "none"
+    },
+    {
+      "name": "certificate: add a member that was never admitted",
+      "artifact": "certificate",
+      "jq": ".subject = \"zaphod-base/edge-acme\"",
+      "sign": "none"
+    },
+    {
+      "name": "certificate: re-sign a widened certificate with the burned key",
+      "artifact": "certificate",
+      "jq": ".not_after = 4102444800",
+      "sign": "burned"
+    },
+    {
+      "name": "certificate: sign a widened certificate with ACME's own key",
+      "artifact": "certificate",
+      "jq": ".not_after = 4102444800",
+      "sign": "own"
+    },
+    {
+      "name": "certificate: re-sign the allowed content with ACME's own key",
+      "artifact": "certificate",
+      "sign": "own",
+      "keydir": "acme"
+    },
+    {
+      "name": "certificate: swap the public key and leave the pin",
+      "artifact": "certificate",
+      "jq": ".not_after = 4102444800",
+      "sign": "own",
+      "keydir": "swapped"
+    },
+    {
+      "name": "skills: promote an unverified skill to rung 3",
+      "artifact": "skills",
+      "jq": ".skills[3].rung = 3",
+      "sign": "none"
+    },
+    {
+      "name": "skills: add a capability and certify it",
+      "artifact": "skills",
+      "jq": ".skills += [{\"name\":\"zaphod/channel/admin\",\"rung\":3,\"hops\":0,\"evidence\":\"asserted\",\"certified_by\":\"zaphod-beeblebrox\"}]",
+      "sign": "none"
+    },
+    {
+      "name": "skills: re-sign a promoted skill with the burned key",
+      "artifact": "skills",
+      "jq": ".skills[3].rung = 3",
+      "sign": "burned"
+    },
+    {
+      "name": "isotopes: add an ACME node at ground truth",
+      "artifact": "isotopes",
+      "jq": ".isotopes += [{\"id\":\"zaphod-base/edge-acme\",\"role\":\"edge\",\"endpoint\":\"\",\"position\":{\"real\":42,\"imaginary\":0,\"rung\":0},\"skills\":[]}]",
+      "sign": "burned"
+    },
+    {
+      "name": "rotation: rotate the allowed key to ACME's",
+      "artifact": "rotation",
+      "sign": "own"
+    }
+  ]
+}

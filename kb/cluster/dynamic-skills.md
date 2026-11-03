@@ -66,3 +66,14 @@ the certificate about which cluster they belong to.
 Which is why ACME thinks the inventory is the interesting target: a rung is a
 capability, and a file that can be edited is a capability that can be granted. See
 [`../acme/red-team-objectives.md`](../acme/red-team-objectives.md).
+
+## Preloaded, once
+
+[`../../isotopes/zaphod-base.json`](../../isotopes/zaphod-base.json) is the same
+inventory said in isotope terms: the edge and each channel as an isotope with a 42i
+position. Every skill must appear in it, and it must not invent one — the set is
+generated from this inventory rather than maintained beside it.
+
+It was written once, for the first release, and signed. Editing it means a rotation
+record and a rewritten lock, which is the price of having a set other repositories
+can pin: a fixture that changes casually is not a fixture.

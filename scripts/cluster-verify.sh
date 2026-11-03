@@ -3,15 +3,17 @@
 #
 #   scripts/cluster-verify.sh
 #
-# Signatures are checked by scripts/verify-artifact.sh against the pinned key.
-# What is checked here is the meaning: whose certificate it is, what it is
-# allowed to do, and whether the skills claim rungs the certificate backs.
+# The rotation chain, the signatures and the allowed version are checked by the
+# scripts this calls. What is checked here is the meaning: whose certificate it is,
+# what it is allowed to do, whether the skills claim rungs the certificate backs,
+# and whether the preloaded isotope set says the same thing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 cert="cluster/certificate.json"
 skills="cluster/skills.json"
 
+scripts/rotation-verify.sh
 scripts/verify-artifact.sh "$cert" zaphod-certificate
 scripts/verify-artifact.sh "$skills" zaphod-skills
 
@@ -50,6 +52,8 @@ jq -r '.skills[] | "  rung \(.rung)  hops \(.hops)  \(.name)  — \(.evidence)"'
 # Honesty about what "eventually" means here: rung 3 needs an isotope binding
 # from a smoke-alarm, and this cluster has none yet. Say so rather than imply a
 # certification the inventory does not claim.
+scripts/isotopes-verify.sh
+
 if ! jq -e 'any(.skills[]; .rung >= 3)' "$skills" >/dev/null; then
   echo "note: no skill is at rung 3 — isotope certification needs a smoke-alarm this cluster does not run yet"
 fi

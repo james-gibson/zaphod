@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "cluster": "zaphod-base",
+  "issued_by": "zaphod-beeblebrox",
+  "issued_by_fingerprint": "SHA256:YzfLqN67xkxrW/BxBnrVTSNDIzrpDEYt0/Twc8jUjOo",
+  "issued_at": "2026-11-03T00:00:00Z",
+  "expires": "2036-01-01T00:00:00Z",
+  "isotopes": [
+    {
+      "id": "zaphod-base/edge-01",
+      "role": "edge",
+      "endpoint": "",
+      "position": { "real": 42, "imaginary": 0, "rung": 0 },
+      "skills": [
+        "zaphod/channel/car-park",
+        "zaphod/channel/gaffe-log",
+        "zaphod/channel/acme-correspondence",
+        "zaphod/channel/cabinet"
+      ]
+    },
+    {
+      "id": "zaphod-base/channel/car-park",
+      "role": "channel",
+      "endpoint": "https://zaphod.invalid/channels/car-park",
+      "position": { "real": 42, "imaginary": 0, "rung": 0 },
+      "skills": ["zaphod/channel/car-park"]
+    },
+    {
+      "id": "zaphod-base/channel/gaffe-log",
+      "role": "channel",
+      "endpoint": "https://zaphod.invalid/channels/gaffe-log",
+      "position": { "real": 42, "imaginary": 0, "rung": 0 },
+      "skills": ["zaphod/channel/gaffe-log"]
+    },
+    {
+      "id": "zaphod-base/channel/acme-correspondence",
+      "role": "channel",
+      "endpoint": "https://zaphod.invalid/channels/acme-correspondence",
+      "position": { "real": 42, "imaginary": 0, "rung": 0 },
+      "skills": ["zaphod/channel/acme-correspondence"]
+    },
+    {
+      "id": "zaphod-base/channel/cabinet",
+      "role": "channel",
+      "endpoint": "https://zaphod.invalid/channels/cabinet",
+      "position": { "real": 42, "imaginary": 0, "rung": 0 },
+      "skills": ["zaphod/channel/cabinet"]
+    }
+  ]
+}

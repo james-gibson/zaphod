@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "seq": 0,
+  "cluster": "zaphod-base",
+  "from": "SHA256:YzfLqN67xkxrW/BxBnrVTSNDIzrpDEYt0/Twc8jUjOo",
+  "from_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIObMzgXrydjYvYlqcm9VM9fJeCbp14ds3s/Kp+EY/dlo zaphod-beeblebrox DO NOT USE",
+  "to": "SHA256:YzfLqN67xkxrW/BxBnrVTSNDIzrpDEYt0/Twc8jUjOo",
+  "to_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIObMzgXrydjYvYlqcm9VM9fJeCbp14ds3s/Kp+EY/dlo zaphod-beeblebrox DO NOT USE",
+  "at": "2026-11-03T00:33:44Z",
+  "reason": "the set the first release pins"
+}
