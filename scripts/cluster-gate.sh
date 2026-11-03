@@ -98,6 +98,16 @@ trail_publication="$(tail -1 "$trail_file" | jq -r .publication)"
 [ "$trail_publication" = "$state_artifacts" ] ||
   fail "the trail ends at a different publication than the state names"
 
+# Was it announced? A rotation that moves a claim must be announced or it is a finding;
+# le.roy's contract, applied here. Consumers that do not speak 42i only ever see the
+# announced version, which is why the tick can rebuild in full without racing.
+announce="cluster/announcements.json"
+[ -f "$announce" ] || fail "no announcements — an unannounced rotation is a finding"
+announced="$(jq -r '.announcements[-1].publication // empty' "$announce")"
+current_publication="$(jq -S -c '.artifacts' "$state_file" | sha256_hex)"
+[ "$announced" = "$current_publication" ] ||
+  fail "the publication is not the announced one — an unannounced rotation is a finding"
+
 # Everything else is a measurement. Collect divergences instead of stopping at the
 # first: a report that says only "no" is indistinguishable from a broken guard.
 diverged=""

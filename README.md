@@ -59,6 +59,7 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 | `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest, and the chain's receipt head |
 | `state.json` | the cluster's own attested record of what it published — beside its secret, outside this repository |
 | `trail.jsonl` | the known trail: each step attested and hash-chained onto the one before, so authorisation is a path and not a token |
+| `announcements.json` | the public announcement of each rotation: monotonic tick, publication digest, effective time — what a consumer that does not speak 42i reads |
 | `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from*, carrying a receipt that links back onto the previous one |
 
 `isotopes/zaphod-base.json` is the preloaded isotope set (see `go.mod`, `cmd/isotope42`): the edge
@@ -75,6 +76,12 @@ The repository is a **publication**, not the authority. Anyone holding it can re
 the lock and the pin, and produce something internally consistent. The cluster therefore keeps its own
 attested state beside its identity secret and refuses a publication it never attested — even a
 self-consistent one signed with the key in the tree.
+
+A rotation has to be **announced to be used**: `cluster/announcements.json` carries a monotonic tick, a
+publication digest and an effective time, and the gate refuses a publication that is not the announced
+one. That is the object `le.roy` serves to applications that do not speak 42i, and it is why a cluster
+tick can afford a full rebuild — "new" means "announced", so there is no window between the write and
+the use.
 
 Authorisation is a **trail, not a token**: the cluster presumes that holding a credential — or a stolen one — says nothing about conduct, and asks instead whether the publication arrived by the known path. A stolen secret buys correct arithmetic on the wrong trail; the gate refuses it with `not the trail I am on`.
 
@@ -169,7 +176,8 @@ success and a failing test, and the run reports where the cluster would be on th
 distance comes from the isotope library's own weights). `scripts/teeth.sh` removes each guard layer in
 a throwaway copy and requires the suite to go red, so it cannot pass because nothing verifies.
 
-See [`docs/lane.md`](docs/lane.md) for what "an actor stays in lane" means here, and why the asymmetry
+The announcement is what `le.roy` serves to applications that do not speak 42i
+([lezz.go#87](https://github.com/james-gibson/lezz.go/issues/87)). See [`docs/lane.md`](docs/lane.md) for what "an actor stays in lane" means here, and why the asymmetry
 is the review rather than the cryptography. [`docs/proxy-chains.md`](docs/proxy-chains.md) makes the
 connection explicit: a proxy hop is a rotation, `hops` carries the distance (checked as
 `distance ≥ hops × 8`), tearing a hop off is a change in the middle of a chain, and the

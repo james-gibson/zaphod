@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "note": "Announcements are how a rotation becomes usable. An unannounced rotation is a finding, not a state change. le.roy carries this to applications that do not speak 42i: a monotonic tick, a publication digest and an effective time.",
+  "announcements": [
+    {
+      "seq": 0,
+      "tick": 0,
+      "verb": "rotate",
+      "claimant": "zaphod-beeblebrox",
+      "at": "2026-11-03T00:00:00Z",
+      "effective_at": "2026-11-03T00:00:00Z",
+      "publication": "6cb106672096ce175d12e8b3f291ecad5f0ed0516e8dd7a67dd3806c94569739",
+      "receipt_head": "d176538a81e0774b5661ab2737884b83419fc5f4dafb4497fdbb92f40b9325c5",
+      "summary": "the first release: certificate, skill inventory and preloaded isotope set"
+    }
+  ]
+}

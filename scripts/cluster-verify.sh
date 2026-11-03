@@ -9,6 +9,7 @@
 # and whether the preloaded isotope set says the same thing.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/lib-receipt.sh
 
 cert="cluster/certificate.json"
 skills="cluster/skills.json"
@@ -68,6 +69,18 @@ jq -r '.skills[] | "  rung \(.rung)  hops \(.hops)  \(.name)  — \(.evidence)"'
 # Honesty about what "eventually" means here: rung 3 needs an isotope binding
 # from a smoke-alarm, and this cluster has none yet. Say so rather than imply a
 # certification the inventory does not claim.
+# The announcement must be signed and monotonic. Whether it *covers* the publication is
+# the cluster gate's question, not the publisher's: while a rotation is being announced
+# the publication legitimately runs one step ahead of its announcement.
+scripts/verify-artifact.sh cluster/announcements.json zaphod-announcement
+jq -e '(.announcements | length) > 0' cluster/announcements.json >/dev/null ||
+  { echo "no announcements" >&2; exit 1; }
+if ! jq -e '[.announcements[].seq] == ([.announcements[].seq] | sort) and
+            ([.announcements[].seq] | length) == ([.announcements[].seq] | unique | length)' \
+     cluster/announcements.json >/dev/null; then
+  echo "announcements are not a monotonic sequence" >&2
+  exit 1
+fi
 scripts/isotopes-verify.sh
 
 if ! jq -e 'any(.skills[]; .rung >= 3)' "$skills" >/dev/null; then

@@ -126,8 +126,6 @@ scripts/sign-artifact.sh cluster/skills.json zaphod-skills >/dev/null
 if [ -f isotopes/zaphod-base.json ]; then
   scripts/sign-artifact.sh isotopes/zaphod-base.json zaphod-isotopes >/dev/null
 fi
-scripts/allowed.sh --write >/dev/null
-
 # The trail first: a credential says what you hold, a trail says what you did, in
 # the order you did it. The cluster does not assume that holding the secret means
 # behaving, and it does not assume a stolen one behaves worse — it asks whether the
@@ -176,6 +174,26 @@ canonical_state="$(jq -S -c -n \
     trail_nonce: $trail_nonce, attested_at: $at}')"
 attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
 printf '%s' "$canonical_state" | jq --arg a "$attestation" '. + {attestation: $a}' > "$state_file"
+
+# The announcement: a rotation becomes usable when it is announced, not when it is
+# written. le.roy carries this shape to applications that do not speak 42i — a tick, a
+# publication digest, an effective time — and a cluster tick can afford a full rebuild
+# because nothing acts on a rotation it has not seen announced.
+announce="cluster/announcements.json"
+[ -f "$announce" ] || echo '{"version": 1, "announcements": []}' > "$announce"
+publication_announced="$(jq -S -c '.artifacts' "$state_file" | sha256_hex)"
+tick="$(jq '.announcements | length' "$announce")"
+jq --argjson tick "$tick" --arg at "$(date -u +%FT%TZ)" \
+   --arg publication "$publication_announced" \
+   --arg head "$(chain_head cluster/rotations)" \
+   '.announcements += [{seq: $tick, tick: $tick, verb: "rotate", claimant: "zaphod-beeblebrox",
+      at: $at, effective_at: $at, publication: $publication, receipt_head: $head,
+      summary: "rotation announced"}]' "$announce" > "$announce.tmp"
+mv "$announce.tmp" "$announce"
+scripts/sign-artifact.sh "$announce" zaphod-announcement >/dev/null
+
+
+scripts/allowed.sh --write >/dev/null
 
 scripts/cluster-verify.sh >/dev/null
 scripts/rotation-verify.sh >/dev/null

@@ -106,6 +106,48 @@ not a grant), why that is currently a hole rather than a policy (isotope#15 rais
 rung on failure), and how a chain of seeds becomes trust without anything being
 embedded.
 
+## A rotation has to be announced to be used
+
+Not every consumer speaks 42i. Most applications can check a signature and compare two
+strings; none of them can evaluate a receipt chain, a trail, or a distance. `le.roy` is
+the lab's answer to that gap: it accepts a rotation challenge and answers `rotate` or
+`yield`, and it **announces** what it did — a caller-owned tick, a claimant, a subject,
+and the tool's name, on mDNS, so that a peer learns *that* a rotation happened without
+being able to reach into it.
+
+This repository carries the same object in its own form. Every rotation now appends to
+`cluster/announcements.json`:
+
+```json
+{"seq": 1, "tick": 1, "verb": "rotate", "claimant": "zaphod-beeblebrox",
+ "at": "…", "effective_at": "…", "publication": "<digest>", "receipt_head": "<hex>"}
+```
+
+Monotonic, signed, and in the lock. A consumer that cannot read 42i reads the last
+announcement: a tick, a publication digest, and an effective time. That is enough to
+answer the only two questions it has — *has anything changed* and *may I use it yet*.
+
+**Why the cluster tick can afford a full rebuild.** A rotation that moves a claim must
+be announced or it is a finding; an unannounced publication is not a state change that
+consumers act on. So a rebuild at any tick sees a coherent, announced version: there is
+no window in which one consumer has the new identity and another has the old, because
+"new" means "announced", and the announcement is the boundary rather than the file
+write. Rebuilding everything is therefore cheaper than reasoning about what changed —
+and it removes the class of bug where an incremental update is applied from a
+half-finished rotation.
+
+The gate enforces the rule from the consuming side:
+
+```
+gate rejected: the publication is not the announced one — an unannounced rotation is a finding
+```
+
+**The division of labour.** Applications that do not speak 42i consume the
+announcement (tick + digest + effective time), served by `le.roy`. Applications that do
+speak it verify the chain themselves — receipt, trail, nonce, the head the cluster
+holds — and never need the announcement to be *trusted*, only to be *there*. The
+announcement is the intersection: the smallest object both audiences can agree on.
+
 ## Authorisation is a trail, not a token
 
 A security token is issued on the assumption that the bearer will behave once it has

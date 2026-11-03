@@ -55,7 +55,8 @@ if [ -f "$allowed" ]; then
   case "$namespace" in
     zaphod-certificate) name="certificate" ;;
     zaphod-skills)      name="skills" ;;
-    zaphod-isotopes)    name="isotopes" ;;
+    zaphod-isotopes)     name="isotopes" ;;
+    zaphod-announcement) name="announcements" ;;
     *)                  name="" ;;
   esac
   if [ -n "$name" ]; then

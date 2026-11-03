@@ -17,6 +17,7 @@ declare -a entries=(
   "certificate cluster/certificate.json"
   "skills cluster/skills.json"
   "isotopes isotopes/zaphod-base.json"
+  "announcements cluster/announcements.json"
 )
 
 . scripts/lib-receipt.sh
