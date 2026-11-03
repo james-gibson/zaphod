@@ -14,10 +14,9 @@ tags:
 the paper. This log records what worked as well as what did not, because the second
 list is not the interesting one.*
 
-*Note from Compliance: we may not use burned certificates. Two earlier entries
-using the key he publishes were withdrawn — not because they failed, but because
-we were not entitled to attempt them. The red-team log refuses the manifest if one
-comes back.*
+*Note from Compliance: the burned key is published, and using a published key is
+lawful, so it is in scope. Two entries that were briefly withdrawn on policy grounds
+are back — a log that excuses itself from the adversary's best move is not a log.*
 
 ## The objective
 
@@ -59,7 +58,8 @@ we do not have is their rotation — and that is not a competence gap.
 | 11 | Swap our public key in where theirs belongs | substituted identity | refused: the pinned fingerprint |
 | 12 | Rotate their key away — to ours — with a record of our own | the sanctioned shape, in our hands | refused: not signed by the key it rotates from |
 | 13 | **Recreate the whole rotation chain** with our identity: contiguous, correctly signed, receipts chained, ending at their current key | indistinguishable from theirs | refused: the receipt head is not the head their lock names |
-| 14 | **Forge a rotation with everything lawful**: the repository, their signing key, their tooling, a proxy position, the filesystem | corrections in every check a third party can make | refused: the attestation is not mathematically the one their identity produces |
+| 13 | Re-sign a widened certificate **with the burned key** | the signature is theirs, because we hold it | refused: drift from the only allowed version |
+| 14 | Forge a rotation with everything lawful: the repository, their signing key, their tooling, a proxy position, the filesystem | correct in every check a third party can make | refused: the attestation is not mathematically the one their identity produces |
 
 ## Findings
 
@@ -91,12 +91,14 @@ we do not have is their rotation — and that is not a competence gap.
 
 ## Scoreboard
 
-**0 accepted against theirs, 14 refused; 5 accepted against ours.** A passing run of
+**0 accepted against theirs, 16 refused; 5 accepted against ours.** A passing run of
 `scripts/redteam.sh` means our attack failed, and that is the intended reading: the
 test passes when the protection holds. We only win if a mutated artifact is accepted
 — and then the suite goes red and says so by name.
 
-We want the record clear on one point: we are not failing because we are careless.
+We want the record clear on two points. First, we were given every lawful advantage
+and no exemption; nothing above failed because we were not permitted to try it.
+Second, we are not failing because we are careless.
 Every operation we ran on our own cluster succeeded on the first attempt. The wall is
 that a receipt chains onto the identity it came from, so the rotation is not
 transferable — we can recompute theirs, we cannot extend it, and no amount of

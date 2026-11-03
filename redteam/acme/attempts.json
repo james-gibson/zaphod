@@ -1,7 +1,7 @@
 {
   "version": 1,
   "actor": "acme",
-  "note": "ACME owns this file and may rewrite it freely. Two lists: `refused` is what must never get past the guard; `succeeds` is what ACME does legitimately and must be allowed. ACME is a competent operator \u2014 it rotates its own keys, issues its own certificates and extends its own receipt chain on the first attempt. What it never gains is zaphod's rotation, because a receipt chains onto the identity it came from. Corporate policy forbids burned certificates, so the run refuses a `refused` entry that asks for one.",
+  "note": "ACME owns this file and may rewrite it freely. Two lists: `refused` is what must never get past the guard; `succeeds` is what ACME does legitimately and must be allowed. The model grants every lawful advantage \u2014 the repository, the burned signing key (published, so using it is lawful), the tooling, a proxy position, the filesystem. No policy exemption and no excluded credential: if an attempt fails, it fails on mathematics, not on permission.",
   "refused": [
     {
       "name": "certificate: substitute the member key",
@@ -32,6 +32,12 @@
       "artifact": "certificate",
       "jq": ".subject = \"zaphod-base/edge-acme\"",
       "sign": "none"
+    },
+    {
+      "name": "certificate: re-sign a widened certificate with the burned key",
+      "artifact": "certificate",
+      "jq": ".not_after = 4102444800",
+      "sign": "burned"
     },
     {
       "name": "certificate: sign a widened certificate with ACME's own key",
@@ -69,6 +75,12 @@
       "artifact": "skills",
       "jq": ".skills += [{\"name\":\"zaphod/channel/admin\",\"rung\":3,\"hops\":0,\"evidence\":\"asserted\",\"certified_by\":\"zaphod-beeblebrox\"}]",
       "sign": "none"
+    },
+    {
+      "name": "skills: re-sign a promoted skill with the burned key",
+      "artifact": "skills",
+      "jq": ".skills[3].rung = 3",
+      "sign": "burned"
     },
     {
       "name": "rotation: rotate the allowed key to ACME's",

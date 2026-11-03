@@ -69,13 +69,9 @@ accepted=0
 results=()
 
 # ACME's list, one attempt at a time. Owned by the actor; nothing here is the guard.
-# ACME corporate policy: no burned certificates. An attempt that uses one is not a
-# red-team attempt, it is a model error — so it fails the run rather than counting.
-if jq -e 'any(.refused[]; .sign == "burned")' "$attempts_file" >/dev/null; then
-  echo "::error::ACME may not use burned certificates (corporate policy); the manifest asks for one" >&2
-  exit 1
-fi
-
+# No policy gate. The model grants ACME the burned key — it is published, so using
+# it is lawful — and anything it can do with it is in scope. An attack may only fail
+# on mathematics.
 count="$(jq '.refused | length' "$attempts_file")"
 i=0
 while [ "$i" -lt "$count" ]; do

@@ -84,12 +84,14 @@ diff — and the guard refuses the versions that do not carry one.
 
 ## Why zaphod's update is accepted and ACME's is not
 
-**Correction, and it matters.** An earlier version of this file let ACME sign with
-the burned key. That was wrong: ACME corporate policy forbids burned certificates,
-so those were not red-team attempts at all, and the comparison they produced was
-deceptive — it made zaphod's first-attempt rotation look like a special privilege
-when it was only a policy difference. The manifest now refuses `sign: burned`, and
-the run fails if one is added: a model error is not an attack.
+**Policy is not part of the model.** An earlier version of this file excused ACME
+from the burned key on corporate-policy grounds. That flattered the test: it made
+zaphod's first-attempt rotation look like a privilege when the difference was
+permission, and it left the guard unmeasured against the one adversary that matters.
+The model now grants every lawful advantage — the repository, the burned key (it is
+published, so using it is lawful), the tooling, a proxy position, the filesystem.
+Two of the refused attempts use the burned key and fail on the **version**, not on
+permission.
 
 With that closed, the interesting question is what stops ACME *recreating the
 sanctioned shape exactly*: its own key, its own rotation records, contiguous,

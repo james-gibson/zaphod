@@ -99,8 +99,9 @@ attempt**, with no manual edits. Without `--new-key` it is a content update with
 ### ACME's red team
 
 `redteam/acme/attempts.json` is ACME's: they may add attempts, change mutations, choose a signing key.
-Corporate policy forbids ACME burned certificates, so the run refuses a manifest that asks for one —
-a model error is not an attack. The guard is not in that file.
+The model grants every lawful advantage — the repository, the burned key (published, so lawful to use),
+the tooling, a proxy position, the filesystem — and no policy exemption. A test that leans on permission
+is flattered by it. The guard is not in that file.
 
 ```sh
 scripts/redteam.sh
@@ -114,7 +115,7 @@ ok    extend our own receipt chain, first attempt — accepted; the chain grew b
 ...
 held  rotation: forged with the repository, the key and the tooling — attestation is not mathematically the one this identity would produce
 ...
-14 attack(s) refused, 0 accepted; 5 ACME operation(s) succeeded.
+16 attack(s) refused, 0 accepted; 5 ACME operation(s) succeeded.
 
 42i 42 + 0i (seed-42, rung 0)
 verdict: ground truth — nothing was accepted
