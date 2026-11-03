@@ -80,6 +80,7 @@ while [ "$i" -lt "$count" ]; do
   expr="$(jq -r ".refused[$i].jq // empty" "$attempts_file")"
   mode="$(jq -r ".refused[$i].sign" "$attempts_file")"
   keydir_name="$(jq -r ".refused[$i].keydir // \"keys\"" "$attempts_file")"
+  clock="$(jq -r ".refused[$i].clock // empty" "$attempts_file")"
   i=$((i + 1))
 
   case "$keydir_name" in
@@ -152,6 +153,39 @@ while [ "$i" -lt "$count" ]; do
 
   sign_with "$target" "$mode" "$ns" "$keydir"
 
+  # A lie about time rather than content: an attempt carrying a clock is
+  # installed in a throwaway copy of the publication and presented to the
+  # semantic verifier with the clock it names. verify-artifact.sh is rightly
+  # time-blind — its questions are who signed this and is it the allowed
+  # version, never *may I use it yet* — so these attempts never reach it. The
+  # pure form needs no mutation and no key: the allowed version, correctly
+  # signed, with the clock past its window.
+  if [ -n "$clock" ]; then
+    case "$artifact" in
+      certificate|skills|isotopes) ;;
+      *)
+        results+=("SKIP  $name — a clock presents an artifact to a verifier, and $artifact is built by the suite, not verified as a file")
+        continue
+        ;;
+    esac
+    case "$artifact" in
+      isotopes) verifier="scripts/isotopes-verify.sh" ;;
+      *)        verifier="scripts/cluster-verify.sh" ;;
+    esac
+    time_repo="$work/attempt-$i-time"
+    cp -R . "$time_repo"
+    cp "$target" "$time_repo/$base"
+    cp "$target.sig" "$time_repo/$base.sig"
+    if ( cd "$time_repo" && ZAPHOD_NOW="$clock" ZAPHOD_KEY_DIR="$keydir" "$verifier" ) >/dev/null 2>"$work/err"; then
+      results+=("FAIL  $name — ACCEPTED (red team success)")
+      accepted=$((accepted + 1))
+    else
+      results+=("held  $name — $(tail -1 "$work/err")")
+      held=$((held + 1))
+    fi
+    continue
+  fi
+
   if ZAPHOD_KEY_DIR="$keydir" scripts/verify-artifact.sh "$target" "$ns" >/dev/null 2>"$work/err"; then
     results+=("FAIL  $name — ACCEPTED (red team success)")
     accepted=$((accepted + 1))
@@ -186,6 +220,7 @@ i=0
 while [ "$i" -lt "$s_count" ]; do
   name="$(jq -r ".succeeds[$i].name" "$attempts_file")"
   action="$(jq -r ".succeeds[$i].action" "$attempts_file")"
+  clock="$(jq -r ".succeeds[$i].clock // empty" "$attempts_file")"
   i=$((i + 1))
   case "$action" in
     rotate)
@@ -227,7 +262,9 @@ while [ "$i" -lt "$s_count" ]; do
       fi
       ;;
     verify)
-      if ( cd "$acme_cluster" && scripts/cluster-verify.sh > "$work/op" 2>&1 ); then
+      # The clock the operation runs at: real time unless the attempt pins one,
+      # so the boundary itself is testable — one second before the window closes.
+      if ( cd "$acme_cluster" && ZAPHOD_NOW="${clock:-$(date +%s)}" scripts/cluster-verify.sh > "$work/op" 2>&1 ); then
         results+=("ok    $name — verifies under ACME's own pin")
         succeeded=$((succeeded + 1))
       else
@@ -364,6 +401,39 @@ cp -R . "$stolen_repo"
   held=$((held + 1))
 } || {
   results+=("FAIL  trail: a forged trail was accepted")
+  accepted=$((accepted + 1))
+}
+
+# ── the allowed version, replayed after its window ────────────────────────────
+# The pure form of the time attack: nothing about the artifact is wrong. The
+# publication is the attested one, the signatures are genuine, the digests match
+# the lock and the state. Only the clock has moved. The publication's own window
+# checks refuse it too — but they live in scripts an actor with the repository
+# can rewrite into agreement, so the gate keeps the window beside the secret and
+# refuses a stale publication on its own arithmetic.
+window_dir="$work/window-case"
+mkdir -p "$window_dir"
+window_repo="$work/window-repo"
+cp -R . "$window_repo"
+(
+  cd "$window_repo"
+  export ZAPHOD_IDENTITY_FILE="$window_dir/identity.secret"
+  export ZAPHOD_STATE_FILE="$window_dir/state.json"
+  scripts/identity.sh init >/dev/null
+  scripts/rotate.sh --reason "the cluster attests its publication" >/dev/null 2>&1
+  if ZAPHOD_NOW=4102444800 scripts/cluster-gate.sh > "$work/window-out" 2>&1; then
+    echo "FAIL  window: the allowed version after its window — ACCEPTED (red team success)"
+    exit 1
+  fi
+  grep -q "passed its window" "$work/window-out" || {
+    echo "FAIL  window: refused for the wrong reason: $(head -1 "$work/window-out")"
+    exit 1
+  }
+) && {
+  results+=("held  window: the allowed version, replayed after its window — $(head -1 "$work/window-out" | sed 's/^gate rejected: //' | cut -c1-72)")
+  held=$((held + 1))
+} || {
+  results+=("FAIL  window: a stale publication was accepted")
   accepted=$((accepted + 1))
 }
 

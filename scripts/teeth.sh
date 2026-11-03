@@ -9,6 +9,9 @@
 #   pin      keys/FINGERPRINT              ACME's own key must be accepted
 #   lock     cluster/allowed.txt           an unsanctioned re-sign must be accepted
 #   receipt  the chain head in the lock    a recreated chain must be accepted
+#   gate     the gate's artifact digests   a rewritten publication must be accepted
+#   expiry   the publication's windows     the allowed version outside its window must be accepted
+#   window   the gate's state window       a stale but genuine publication must be accepted
 #
 # The lock case is deliberately *not* an ACME attempt: corporate policy forbids
 # ACME burned certificates, and the attack that only the lock catches — a changed
@@ -93,4 +96,49 @@ cp -R . "$work/gate"
 )
 echo "teeth: cluster gate removed — a rewritten publication got through"
 
-echo "all four layers are load-bearing: removing any one lets a change through"
+# ── layer 5: remove the publication's window comparisons ──────────────────────
+# The window is asked twice on the publication side — the certificate's
+# not_after and the set's expires — and both must go before the pure time attack
+# succeeds: the allowed version, unmodified and correctly signed, presented
+# outside its window with a pinned clock.
+cp -R . "$work/expiry"
+(
+  cd "$work/expiry"
+  perl -0pi -e 's/\[ "\$not_after" -gt "\$now" \] \|\| \{ .*/true/' scripts/cluster-verify.sh
+  perl -0pi -e 's/if \[ "\$expiry_epoch" -le "\$now" \]; then/if false; then/' scripts/isotopes-verify.sh
+  grep -q '^true$' scripts/cluster-verify.sh || fail "expiry removal did not apply"
+  grep -q 'if false; then' scripts/isotopes-verify.sh || fail "set expiry removal did not apply"
+)
+if ( cd "$work/expiry" && scripts/redteam.sh > "$work/out-expiry" 2>&1 ); then
+  cat "$work/out-expiry" >&2
+  fail "expiry removed: redteam.sh passed; the window cases prove nothing"
+fi
+grep -q "RED TEAM SUCCEEDED" "$work/out-expiry" ||
+  { cat "$work/out-expiry" >&2; fail "expiry removed: the suite went red without naming a success"; }
+grep -q "outside its window" "$work/out-expiry" ||
+  { cat "$work/out-expiry" >&2; fail "expiry removed: the accepted attempt was not the window replay"; }
+echo "teeth: expiry removed — the allowed version outside its window got through"
+
+# ── layer 6: remove the cluster gate's window comparison ──────────────────────
+# The out-of-band window: the state records valid_until, and the gate refuses a
+# publication presented after it. With the comparison gone, the allowed version —
+# genuine, attested, unmodified — is accepted with the clock past its window.
+cp -R . "$work/gate-window"
+mkdir -p "$work/gate-window-id"
+(
+  cd "$work/gate-window"
+  export ZAPHOD_IDENTITY_FILE="$work/gate-window-id/identity.secret"
+  export ZAPHOD_STATE_FILE="$work/gate-window-id/state.json"
+  scripts/identity.sh init >/dev/null
+  scripts/rotate.sh --reason "teeth: attest the publication" >/dev/null 2>&1
+  if ZAPHOD_NOW=4102444800 scripts/cluster-gate.sh >/dev/null 2>&1; then
+    fail "gate window present: a stale publication was accepted"
+  fi
+  perl -0pi -e 's/\[ "\$now" -lt "\$state_valid_until" \] \|\|/true ||/' scripts/cluster-gate.sh
+  grep -q '^true ||' scripts/cluster-gate.sh || fail "gate window removal did not apply"
+  ZAPHOD_NOW=4102444800 scripts/cluster-gate.sh >/dev/null 2>&1 ||
+    fail "gate window removed: still refused; the case does not test the gate's window"
+)
+echo "teeth: gate window removed — the allowed version after its window got through"
+
+echo "all six layers are load-bearing: removing any one lets a change through"

@@ -26,7 +26,9 @@ pin="$(awk '{print $2}' keys/FINGERPRINT)"
 expires="$(jq -r .expires "$set_file")"
 expiry_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$expires" +%s 2>/dev/null ||
   date -u -d "$expires" +%s 2>/dev/null || echo 0)"
-if [ "$expiry_epoch" -le "$(date +%s)" ]; then
+# The same clock the certificate's window reads, so one run sees one instant.
+now="${ZAPHOD_NOW:-$(date +%s)}"
+if [ "$expiry_epoch" -le "$now" ]; then
   echo "the preloaded set expired at $expires" >&2
   exit 1
 fi

@@ -126,6 +126,21 @@ scripts/sign-artifact.sh cluster/skills.json zaphod-skills >/dev/null
 if [ -f isotopes/zaphod-base.json ]; then
   scripts/sign-artifact.sh isotopes/zaphod-base.json zaphod-isotopes >/dev/null
 fi
+
+# The window this attestation covers: the earliest of the artifact windows. The
+# state records it so the gate can refuse a publication presented after it —
+# the artifacts' not_after and expires are the claims, and the state's memory of
+# them is the check.
+valid_until="$(jq -r .not_after cluster/certificate.json)"
+if [ -f isotopes/zaphod-base.json ]; then
+  set_expires="$(jq -r .expires isotopes/zaphod-base.json)"
+  set_expiry_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$set_expires" +%s 2>/dev/null ||
+    date -u -d "$set_expires" +%s 2>/dev/null || echo 0)"
+  if [ "$set_expiry_epoch" -lt "$valid_until" ]; then
+    valid_until="$set_expiry_epoch"
+  fi
+fi
+
 # The trail first: a credential says what you hold, a trail says what you did, in
 # the order you did it. The cluster does not assume that holding the secret means
 # behaving, and it does not assume a stolen one behaves worse — it asks whether the
@@ -162,16 +177,18 @@ hash="$(printf '%s' "$(jq -S -c --arg m "$mac" '. + {attestation: $m}' <<<"$entr
 jq -c --arg m "$mac" --arg h "$hash" '. + {attestation: $m, hash: $h}' <<<"$entry" >> "$trail"
 
 # The cluster's own record of what it just accepted: the publication, the chain
-# head, and the trail head it is on. Kept outside the repository, attested with the
-# secret. The publication can be rewritten; this cannot.
+# head, the trail head it is on, and the window it is valid for. Kept outside the
+# repository, attested with the secret. The publication can be rewritten; this
+# cannot.
 canonical_state="$(jq -S -c -n \
   --argjson artifacts "$publication" \
   --arg head "$(chain_head cluster/rotations)" \
   --arg trail_head "$hash" \
   --arg trail_nonce "$nonce" \
+  --argjson valid_until "$valid_until" \
   --arg at "$(date -u +%FT%TZ)" \
   '{artifacts: $artifacts, receipt_head: $head, trail_head: $trail_head,
-    trail_nonce: $trail_nonce, attested_at: $at}')"
+    trail_nonce: $trail_nonce, valid_until: $valid_until, attested_at: $at}')"
 attestation="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_hex)"
 printf '%s' "$canonical_state" | jq --arg a "$attestation" '. + {attestation: $a}' > "$state_file"
 

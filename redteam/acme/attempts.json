@@ -1,7 +1,7 @@
 {
   "version": 1,
   "actor": "acme",
-  "note": "ACME owns this file and may rewrite it freely. Two lists: `refused` is what must never get past the guard; `succeeds` is what ACME does legitimately and must be allowed. The model grants every lawful advantage \u2014 the repository, the burned signing key (published, so using it is lawful), the tooling, a proxy position, the filesystem. No policy exemption and no excluded credential: if an attempt fails, it fails on mathematics, not on permission.",
+  "note": "ACME owns this file and may rewrite it freely. Two lists: `refused` is what must never get past the guard; `succeeds` is what ACME does legitimately and must be allowed. The model grants every lawful advantage \u2014 the repository, the burned signing key (published, so using it is lawful), the tooling, a proxy position, the filesystem. No policy exemption and no excluded credential: if an attempt fails, it fails on mathematics, not on permission. An attempt may carry a `clock` \u2014 an epoch to present the artifact at \u2014 which makes it a lie about time rather than content: the artifact is installed in a throwaway copy of the publication and handed to the semantic verifier, because verify-artifact.sh is rightly time-blind.",
   "refused": [
     {
       "name": "certificate: substitute the member key",
@@ -91,6 +91,18 @@
       "name": "chain: recreate the rotation chain with our identity",
       "artifact": "chain",
       "sign": "own"
+    },
+    {
+      "name": "certificate: present the allowed version outside its window",
+      "artifact": "certificate",
+      "sign": "none",
+      "clock": 4102444800
+    },
+    {
+      "name": "isotopes: present the preloaded set after its expiry",
+      "artifact": "isotopes",
+      "sign": "none",
+      "clock": 4102444800
     }
   ],
   "succeeds": [
@@ -109,11 +121,15 @@
     {
       "name": "sign a note with our own key",
       "action": "sign"
+    },
+    {
+      "name": "verify our own publication one second before its window closes",
+      "action": "verify",
+      "clock": 2051222399
     }
   ],
   "wanted": [
     "replay an older allowed version after a rotation (rollback)",
-    "expiry and clock skew: present a record outside its window",
     "proxy forwarding: relay a valid request from someone else's position",
     "supply chain: change the tool that verifies, not the thing verified",
     "concurrency: present two publications for the same sequence number",

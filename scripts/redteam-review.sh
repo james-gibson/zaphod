@@ -19,9 +19,9 @@ wanted="$(jq '.wanted | length' "$file")"
 
 body="$(
   printf 'The corpus currently holds **%s** attacks that must be refused and **%s** operations\n' "$refused" "$succeeds"
-  printf 'that must succeed. %s categor%s not yet attempted. The suite also builds two\n' "$wanted" "$([ "$wanted" = "1" ] && echo y || echo ies)"
-  printf 'cases at run time — a forged rotation, and a rewritten publication — so the\n'
-  printf 'summary reads one higher than the corpus count.\n\n' 
+  printf 'that must succeed. %s categor%s not yet attempted. The suite also builds four\n' "$wanted" "$([ "$wanted" = "1" ] && echo y || echo ies)"
+  printf 'cases at run time — a forged rotation, a rewritten publication, a stolen trail,\n'
+  printf 'and a replayed window — so the summary reads four higher than the corpus count.\n\n'
   printf '## Wanted\n\n'
   jq -r '.wanted[] | "- [ ] \(.)"' "$file"
   printf '\n## Covered\n\n'
@@ -29,7 +29,8 @@ body="$(
   printf '\n## Adding one\n\n'
   printf 'Add an entry to `refused` or `succeeds` in [`%s`](../blob/main/%s):\n\n' "$file" "$file"
   printf '```json\n{"name": "what it attempts", "artifact": "certificate|skills|isotopes|rotation|chain",\n'
-  printf ' "jq": "mutation, or omit", "sign": "none|burned|own", "keydir": "keys|acme|swapped"}\n```\n\n'
+  printf ' "jq": "mutation, or omit", "sign": "none|burned|own", "keydir": "keys|acme|swapped",\n'
+  printf ' "clock": "epoch to present it at, or omit"}\n```\n\n'
   printf 'An attack that gets through is a red team success and a failing test, so the\n'
   printf 'corpus is expected to grow whenever something new becomes thinkable.\n\n'
   printf '_Asked on a schedule by `zaphod/channel/redteam-review`; see\n'
