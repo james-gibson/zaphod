@@ -97,6 +97,15 @@ anything inside the space it owns; every change outside that space arrives as a
 record — a rotation with a signature, a lock rewrite, a diff — and what is not
 recorded is refused by arithmetic rather than by process.
 
+## From one identity to a proxy chain
+
+The same three questions decide a proxy chain, where each hop is a rotation of
+authority and the distance grows with every hop. [`proxy-chains.md`](proxy-chains.md)
+maps them onto what is here — including why nodes may self-promote (a rung is a claim,
+not a grant), why that is currently a hole rather than a policy (isotope#15 raises the
+rung on failure), and how a chain of seeds becomes trust without anything being
+embedded.
+
 ## Authorisation is a trail, not a token
 
 A security token is issued on the assumption that the bearer will behave once it has

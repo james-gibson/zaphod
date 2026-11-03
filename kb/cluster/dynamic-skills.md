@@ -35,7 +35,10 @@ the highest claim it can evidence:
 
 `hops` is the distance from the skill to the alarm that certified it — 0 when the
 alarm is in the same cluster, and one per proxy hop otherwise. A skill reached
-through a proxy is not less certified; it is certified further away.
+through a proxy is not less certified; it is certified further away, and the
+preloaded set carries the same figure so that a position claiming 0 hops while the
+distance says otherwise is refused (`distance ≥ hops × 8`, the hop penalty from
+smoke-alarm's certification model).
 
 ## What this cluster claims
 

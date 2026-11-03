@@ -2,5 +2,5 @@
 # Canonical is `jq -S -c`. Updated only by scripts/rotate.sh, with a rotation record.
 846a292a786d12303601462273833a10122a7542590796f0e354730369c7dcf8  certificate
 5f1e68138fd4e539911c959cd11ce24e1843c989c9c9aeb2e1944efa2f64aff6  skills
-9004bba93a43cfe5c4e46cb1b505ef292cc322cd9d07ccb24518a806ea34b95a  isotopes
+0bb749ec91ee6e4bf3eec89627cae1a2501df9fc641c4800939f2e9cf500ac9b  isotopes
 d176538a81e0774b5661ab2737884b83419fc5f4dafb4497fdbb92f40b9325c5  receipt

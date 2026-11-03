@@ -154,7 +154,11 @@ distance comes from the isotope library's own weights). `scripts/teeth.sh` remov
 a throwaway copy and requires the suite to go red, so it cannot pass because nothing verifies.
 
 See [`docs/lane.md`](docs/lane.md) for what "an actor stays in lane" means here, and why the asymmetry
-is the review rather than the cryptography.
+is the review rather than the cryptography. [`docs/proxy-chains.md`](docs/proxy-chains.md) makes the
+connection explicit: a proxy hop is a rotation, `hops` carries the distance (checked as
+`distance ≥ hops × 8`), tearing a hop off is a change in the middle of a chain, and the
+chain of seeds becomes trust the same way this rotation chain does — by nothing being embedded
+and every link naming the one before it.
 
 ## Encrypted notes
 

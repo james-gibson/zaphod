@@ -34,6 +34,7 @@ type preloaded struct {
 		Role     string   `json:"role"`
 		Endpoint string   `json:"endpoint"`
 		Position position `json:"position"`
+		Hops     int      `json:"hops"`
 		Skills   []string `json:"skills"`
 	} `json:"isotopes"`
 }
@@ -97,6 +98,12 @@ func check(path string) int {
 			bad++
 		}
 		distance := int(iso.Position.Imaginary)
+		if min := iso.Hops * isotope.DefaultWeights["isotope-variation"]; distance < min {
+			fmt.Fprintf(os.Stderr, "isotope42: %s: %d proxy hop(s) carry at least distance %d, position says %d\n",
+				iso.ID, iso.Hops, min, distance)
+			bad++
+			continue
+		}
 		rung := isotope.RungForDistance(distance, isotope.DefaultRungThresholds)
 		if rung != iso.Position.Rung {
 			fmt.Fprintf(os.Stderr, "isotope42: %s: rung %d claimed at distance %d, which is rung %d\n",
@@ -104,8 +111,8 @@ func check(path string) int {
 			bad++
 			continue
 		}
-		fmt.Printf("  %-40s 42 + %.0fi (rung %d)  (%d skill(s))\n",
-			iso.ID, iso.Position.Imaginary, iso.Position.Rung, len(iso.Skills))
+		fmt.Printf("  %-40s 42 + %.0fi (rung %d)  %d hop(s)  (%d skill(s))\n",
+			iso.ID, iso.Position.Imaginary, iso.Position.Rung, iso.Hops, len(iso.Skills))
 	}
 	if bad > 0 {
 		fmt.Fprintf(os.Stderr, "isotope42: %d position(s) inconsistent\n", bad)
