@@ -16,8 +16,9 @@ being unable to produce a valid signature. It can. It does, in
 | receipt (`chain/rotations/*.receipt`, head in the lock) | *did this rotation come back onto the same identity?* | a chain recreated with another identity is a different chain, and no signature on it says otherwise |
 | attestation (`attestation` field, checked by the cluster) | *did the running identity authorise it?* | the signing key is public, so a signature cannot answer this; the secret was never in the repository |
 | cluster gate (`cluster-gate.sh`, state beside the secret) | *is this what I published?* | every file in the repository can be rewritten, including the lock and the pin, by anyone with the repo |
+| window (`valid_until` in the state, checked by the gate) | *is it still within the window I attested?* | the publication's own `not_after` and `expires` are claims in a rewritable repository, and the clock is the one input a signature never covers |
 
-The three are independent, and the tests prove each one is load-bearing:
+These layers are independent, and the tests prove each one is load-bearing:
 `scripts/teeth.sh` removes them one at a time in a throwaway copy and requires the
 red team to succeed — going red, and showing the drift.
 
@@ -141,6 +142,15 @@ The gate enforces the rule from the consuming side:
 ```
 gate rejected: the publication is not the announced one — an unannounced rotation is a finding
 ```
+
+The announcement's other question — *may I use it yet* — is a window, and the window is kept the way
+the digests are: `rotate.sh` records `valid_until`, the earliest of the artifact windows, in the
+cluster's state, and the gate refuses a publication presented after it. The corpus carries the pure
+form of the question — the allowed version, unmodified and correctly signed, with the clock pinned
+past its window (`ZAPHOD_NOW`, because 2035 is a long time to wait for a test) — and the question is
+asked twice, once on each side of the lane: the publication's own expiry checks refuse it, and so
+does the gate, which does not read the publication's scripts at all. A stale version is not a state
+change, and it is not a finding either; it is simply no longer the version anyone may use.
 
 **The division of labour.** Applications that do not speak 42i consume the
 announcement (tick + digest + effective time), served by `le.roy`. Applications that do

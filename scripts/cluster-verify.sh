@@ -21,7 +21,9 @@ scripts/verify-artifact.sh "$skills" zaphod-skills
 pin="$(awk '{print $2}' keys/FINGERPRINT)"
 issuer="$(jq -r .issuer "$cert")"
 cluster="$(jq -r .cluster "$cert")"
-now="$(date +%s)"
+# The clock is an input like any other: ZAPHOD_NOW pins it for a verifier or a
+# test, and every window in this script reads the same instant.
+now="${ZAPHOD_NOW:-$(date +%s)}"
 
 [ "$issuer" = "zaphod-beeblebrox" ] || { echo "wrong issuer: $issuer" >&2; exit 1; }
 [ "$(jq -r .subject_fingerprint "$cert")" = "$pin" ] ||

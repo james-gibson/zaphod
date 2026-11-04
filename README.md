@@ -57,7 +57,7 @@ ssh-keygen -Y verify -f keys/allowed_signers -I zaphod-beeblebrox \
 | `certificate.json` | issued by `zaphod-beeblebrox`, scope `attest,registry`, for `zaphod-base/edge-01` |
 | `skills.json` | one skill per published channel, with the rung it has earned (0 declared → 3 scenario-linked) |
 | `allowed.txt` | the **only allowed version** of each signed artifact, by canonical digest, and the chain's receipt head |
-| `state.json` | the cluster's own attested record of what it published — beside its secret, outside this repository |
+| `state.json` | the cluster's own attested record of what it published and the window it is valid for — beside its secret, outside this repository |
 | `trail.jsonl` | the known trail: each step attested and hash-chained onto the one before, so authorisation is a path and not a token |
 | `announcements.json` | the public announcement of each rotation: monotonic tick, publication digest, effective time — what a consumer that does not speak 42i reads |
 | `rotations/NNN-*.json` | the chain: each record signed by the key it rotates *from*, carrying a receipt that links back onto the previous one |
@@ -108,6 +108,14 @@ A chain recreated with another identity — contiguous, correctly signed, ending
 is refused on that head alone. A rotation is a claim back onto itself, so recreating it does not
 inherit it.
 
+A fourth question is time: *may I use it yet?* The publication's own window checks — `not_after` on
+the certificate, `expires` on the isotope set — live in scripts an actor with the repository can
+rewrite, so the gate keeps the window beside the secret: `rotate.sh` records `valid_until`, the
+earliest of the artifact windows, in the cluster's state, and the gate refuses a publication
+presented after it. The corpus carries the pure form — the allowed version, unmodified and
+correctly signed, presented outside its window — and `scripts/teeth.sh` removes each window check
+in turn to prove both are load-bearing.
+
 ### The sanctioned update
 
 ```sh
@@ -147,13 +155,15 @@ scripts/redteam.sh
 
 ```
 held  certificate: re-sign the allowed content with ACME's own key — not the pinned key
+held  certificate: present the allowed version outside its window — certificate expired at 2051222400
 held  chain: recreate the rotation chain with our identity — chain head … is not the head the lock names
 ok    rotate our own cluster key, first attempt — accepted on the first attempt; its own head, not zaphod's
 ok    extend our own receipt chain, first attempt — accepted; the chain grew by one
 ...
 held  rotation: forged with the repository, the key and the tooling — attestation is not mathematically the one this identity would produce
+held  window: the allowed version, replayed after its window — the attested publication passed its window at 2051222400
 ...
-16 attack(s) refused, 0 accepted; 5 ACME operation(s) succeeded.
+21 attack(s) refused, 0 accepted; 6 ACME operation(s) succeeded.
 
 42i 42 + 0i (seed-42, rung 0)
 verdict: ground truth — nothing was accepted
@@ -168,7 +178,9 @@ The last cases are set up to lose on purpose: ACME is given the repository, the 
 tooling, a proxy position and the filesystem. It produces a rotation that is correct in every respect a
 third party can check, and a publication that is internally consistent end to end. The cluster refuses
 both on arithmetic — the attestation and the attested state are computed from an identity secret the
-repository never held — not on policy, review or ownership. See [`docs/lane.md`](docs/lane.md) for the
+repository never held — not on policy, review or ownership. With the clock pinned past its window
+(`ZAPHOD_NOW`), the allowed publication itself — unchanged and correctly signed — is refused too, on
+the window the state recorded rather than any claim the publication makes. See [`docs/lane.md`](docs/lane.md) for the
 one boundary that is left out (process memory) and why it is named rather than assumed.
 
 Every attack must be refused. A passing run means the protection held; an accepted one is a red team

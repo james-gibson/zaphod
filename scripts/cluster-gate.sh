@@ -11,12 +11,14 @@
 #
 #   <identity-dir>/state.json
 #     { artifacts: {certificate: sha256, skills: sha256, isotopes: sha256},
-#       receipt_head: <hex>, attested_at: <iso8601>, attestation: <hex> }
+#       receipt_head: <hex>, trail_head: <hex>, trail_nonce: <hex>,
+#       valid_until: <epoch>, attested_at: <iso8601>, attestation: <hex> }
 #
 # Two different jobs, and they are complementary:
 #
-#   * security — refuse a publication this cluster never attested. That is the exit
-#     code, and it is binary.
+#   * security — refuse a publication this cluster never attested, or one that
+#     outlived the window it was attested for. That is the exit code, and it is
+#     binary.
 #   * noise    — say *what* diverged, and by how much, even for the parts that did
 #     not trip the refusal. A layer that only refuses cannot tell you whether it
 #     refused the right thing, and two publications that differ are a measurement
@@ -48,6 +50,21 @@ want="$(printf '%s' "$(cat "$identity_file"):${canonical_state}:state" | sha256_
 got="$(jq -r '.attestation // empty' "$state_file")"
 [ -n "$got" ] || fail "cluster state carries no attestation"
 [ "$got" = "$want" ] || fail "the cluster state is not the one this identity attested (not mathematically the same)"
+
+# The window: the state records the earliest window of what it attested, and the
+# gate refuses a publication presented after it. The artifacts' own not_after and
+# expires are claims in a repository anyone can rewrite, and the clock is the one
+# input a signature never covers — so this is the time-bounded twin of the digest
+# check below: is this what I attested, and is it still within the window I
+# attested it for?
+state_valid_until="$(jq -r '.valid_until // empty' "$state_file")"
+[ -n "$state_valid_until" ] || fail "cluster state does not record the window it attested"
+now="${ZAPHOD_NOW:-$(date +%s)}"
+# Strictly before, matching the publication's own checks: those refuse in the
+# second the window closes, and the out-of-band layer must never be the laxer
+# one.
+[ "$now" -lt "$state_valid_until" ] ||
+  fail "the attested publication passed its window at $state_valid_until — an expired version is not a state change, it is a stale one"
 
 digest() { jq -S -c . "$1" | sha256_hex; }
 short() { printf '%s' "${1:0:12}"; }
